@@ -8,3 +8,12 @@ from app.models.experiment import MLExperiment
 from app.models.job import ProcessingJob
 
 __all__ = [
+    "Dataset",
+    "SocialPost",
+    "SocialUser",
+    "UserRelationship",
+    "TopicCluster",
+    "Community",
+    "MLExperiment",
+    "ProcessingJob"
+]
