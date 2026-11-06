@@ -10,3 +10,11 @@ class SocialUser(Base):
     user_id_str = Column(String(128), index=True, nullable=False)
     username = Column(String(128), nullable=False)
     follower_count = Column(Integer, default=0)
+    following_count = Column(Integer, default=0)
+    community_id = Column(Integer, nullable=True, index=True) # Community ID from Louvain
+    degree_centrality = Column(Float, default=0.0)
+    betweenness_centrality = Column(Float, default=0.0)
+    pagerank = Column(Float, default=0.0)
+    primary_topic_id = Column(Integer, nullable=True) # dominant topic discovered for this user
+
+    # 3D layout coordinates for network visualization

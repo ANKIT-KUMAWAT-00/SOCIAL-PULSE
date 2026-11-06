@@ -14,3 +14,8 @@ class SocialPost(Base):
     cleaned_text = Column(Text, nullable=True)
     timestamp = Column(DateTime, nullable=True, default=datetime.utcnow)
     likes = Column(Integer, default=0)
+    comments = Column(Integer, default=0)
+    shares = Column(Integer, default=0)
+    topic_cluster_id = Column(Integer, nullable=True, index=True) # -1 for outlier, 0..K for clusters
+    embedding_x = Column(Float, nullable=True) # 2D / 3D UMAP coordinate
+    embedding_y = Column(Float, nullable=True)
