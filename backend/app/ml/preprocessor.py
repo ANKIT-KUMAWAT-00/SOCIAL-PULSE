@@ -26,3 +26,23 @@ def clean_social_text(text: str) -> str:
     """
     Cleans raw social media text:
     - Removes URLs and HTML tags
+    - Handles handles and hashtags gracefully (strips @ and # while keeping token)
+    - Removes non-alphanumeric punctuation while preserving technical tokens
+    - Normalizes multiple whitespace
+    """
+    if not text:
+        return ""
+
+    # Remove URLs
+    text = re.sub(r'https?://\S+|www\.\S+', '', text)
+    # Remove HTML tags
+    text = re.sub(r'<.*?>', '', text)
+    # Strip @ from mentions and # from hashtags
+    text = re.sub(r'[@#](\w+)', r'\1', text)
+    # Convert to lowercase
+    text = text.lower()
+    # Replace dashes and underscores with spaces
+    text = re.sub(r'[-_]', ' ', text)
+    # Remove remaining punctuation
+    text = text.translate(str.maketrans('', '', string.punctuation))
+    # Remove extra spaces
