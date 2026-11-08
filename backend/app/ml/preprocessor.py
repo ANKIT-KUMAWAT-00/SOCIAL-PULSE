@@ -46,3 +46,24 @@ def clean_social_text(text: str) -> str:
     # Remove remaining punctuation
     text = text.translate(str.maketrans('', '', string.punctuation))
     # Remove extra spaces
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+def tokenize_and_remove_stopwords(cleaned_text: str) -> List[str]:
+    """
+    Tokenizes text and filters out common stopwords and single-character tokens.
+    """
+    tokens = cleaned_text.split()
+    return [t for t in tokens if len(t) > 2 and t not in STOPWORDS]
+
+def preprocess_corpus(texts: List[str]) -> List[str]:
+    """
+    Full pipeline on a collection of social media texts.
+    Returns cleaned, normalized, space-joined token strings.
+    """
+    processed = []
+    for t in texts:
+        cleaned = clean_social_text(t)
+        tokens = tokenize_and_remove_stopwords(cleaned)
+        processed.append(" ".join(tokens) if tokens else cleaned)
+    return processed
