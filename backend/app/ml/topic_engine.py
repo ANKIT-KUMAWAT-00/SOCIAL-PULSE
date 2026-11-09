@@ -108,3 +108,53 @@ class TopicEngine:
         # PCA fallback
         n_comp = min(n_components, features.shape[1], n_samples)
         pca = PCA(n_components=n_comp, random_state=42)
+        coords = pca.fit_transform(features)
+        if coords.shape[1] < n_components:
+            pad = np.zeros((n_samples, n_components - coords.shape[1]))
+            coords = np.hstack([coords, pad])
+        return coords
+
+    def cluster_data(
+        self,
+        features: np.ndarray,
+        algorithm: str = "hdbscan",
+        n_clusters: int = 5,
+        min_cluster_size: int = 5,
+        eps: float = 0.5,
+        min_samples: int = 5
+    ) -> np.ndarray:
+        """
+        Runs unsupervised clustering on extracted feature representations.
+        Returns cluster label array (-1 for outliers, 0..K-1 for clusters).
+        """
+        n_samples = len(features)
+        if n_samples < 2:
+            return np.zeros(n_samples, dtype=int)
+
+        if algorithm == "hdbscan":
+            min_c_size = min(min_cluster_size, max(2, n_samples // 10))
+            clusterer = hdbscan.HDBSCAN(
+                min_cluster_size=min_c_size,
+                metric="euclidean",
+                cluster_selection_method="eom"
+            )
+            labels = clusterer.fit_predict(features)
+            # If all are outliers, fall back to K-Means
+            if np.all(labels == -1):
+                km = KMeans(n_clusters=min(n_clusters, max(2, n_samples // 4)), random_state=42, n_init='auto')
+                labels = km.fit_predict(features)
+            return labels
+
+        elif algorithm == "kmeans":
+            k = min(n_clusters, max(2, n_samples // 3))
+            km = KMeans(n_clusters=k, random_state=42, n_init='auto')
+            return km.fit_predict(features)
+
+        elif algorithm == "dbscan":
+            db = DBSCAN(eps=eps, min_samples=min_samples, metric="cosine")
+            labels = db.fit_predict(features)
+            return labels
+
+        else:
+            raise ValueError(f"Unsupported clustering algorithm: {algorithm}")
+
