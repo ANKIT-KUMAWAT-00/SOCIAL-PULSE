@@ -58,3 +58,53 @@ class TopicEngine:
                     return np.array(embeddings, dtype=np.float32)
                 except Exception as e:
                     print(f"[TopicEngine] SentenceTransformer encoding error: {e}. Falling back to TF-IDF.")
+            
+            # High-fidelity Fallback: TF-IDF with SVD dense projection
+            vectorizer = TfidfVectorizer(max_features=2500, ngram_range=(1, 2), sublinear_tf=True)
+            tfidf_mat = vectorizer.fit_transform(cleaned_texts)
+            n_components = min(128, max(10, tfidf_mat.shape[1] - 1, tfidf_mat.shape[0] - 1))
+            svd = TruncatedSVD(n_components=n_components, random_state=42)
+            dense_feats = svd.fit_transform(tfidf_mat)
+            # L2 normalize
+            norms = np.linalg.norm(dense_feats, axis=1, keepdims=True)
+            norms[norms == 0] = 1.0
+            return dense_feats / norms
+
+        else: # "tfidf"
+            vectorizer = TfidfVectorizer(max_features=2500, ngram_range=(1, 2), sublinear_tf=True)
+            tfidf_mat = vectorizer.fit_transform(cleaned_texts)
+            n_comp = min(64, max(5, tfidf_mat.shape[1] - 1, tfidf_mat.shape[0] - 1))
+            svd = TruncatedSVD(n_components=n_comp, random_state=42)
+            return svd.fit_transform(tfidf_mat)
+
+    def reduce_dimensions(
+        self,
+        features: np.ndarray,
+        method: str = "umap",
+        n_components: int = 3
+    ) -> np.ndarray:
+        """
+        Reduces feature dimensions to 2D or 3D coordinates for visualization and density clustering.
+        """
+        n_samples = features.shape[0]
+        if n_samples < 5:
+            return np.zeros((n_samples, n_components), dtype=np.float32)
+
+        if method == "umap":
+            try:
+                n_neighbors = min(15, max(3, n_samples - 1))
+                reducer = umap.UMAP(
+                    n_components=n_components,
+                    n_neighbors=n_neighbors,
+                    min_dist=0.15,
+                    metric="cosine",
+                    random_state=42
+                )
+                coords = reducer.fit_transform(features)
+                return coords
+            except Exception as e:
+                print(f"[TopicEngine] UMAP error: {e}. Falling back to PCA.")
+        
+        # PCA fallback
+        n_comp = min(n_components, features.shape[1], n_samples)
+        pca = PCA(n_components=n_comp, random_state=42)
