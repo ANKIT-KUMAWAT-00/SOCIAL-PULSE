@@ -14,3 +14,16 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api"
     DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/socialpulse.db")
     CORS_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "*"
+    ]
+    MAX_UPLOAD_SIZE_MB: int = 50
+
+    class Config:
+        env_file = ".env"
+        extra = "allow"
+
+settings = Settings()
