@@ -158,3 +158,38 @@ class TopicEngine:
         else:
             raise ValueError(f"Unsupported clustering algorithm: {algorithm}")
 
+    def extract_cluster_topics(
+        self,
+        cleaned_texts: List[str],
+        raw_texts: List[str],
+        labels: np.ndarray,
+        features: np.ndarray
+    ) -> List[Dict[str, Any]]:
+        """
+        Extracts representative c-TF-IDF keywords, human-readable labels, and exemplar posts per cluster.
+        """
+        unique_labels = sorted(list(set(labels)))
+        cluster_info_list = []
+        total_docs = len(cleaned_texts)
+
+        # Build concatenated docs per cluster for class-based TF-IDF (c-TF-IDF)
+        cluster_docs = {}
+        for idx, lbl in enumerate(labels):
+            cluster_docs.setdefault(lbl, []).append(cleaned_texts[idx])
+
+        # Group docs into single virtual document per cluster
+        grouped_labels = []
+        grouped_texts = []
+        for lbl, doc_list in cluster_docs.items():
+            grouped_labels.append(lbl)
+            grouped_texts.append(" ".join(doc_list))
+
+        vectorizer = TfidfVectorizer(max_features=1000, ngram_range=(1, 2))
+        try:
+            c_tfidf_matrix = vectorizer.fit_transform(grouped_texts).toarray()
+            vocab = np.array(vectorizer.get_feature_names_out())
+        except Exception:
+            c_tfidf_matrix = None
+            vocab = []
+
+        color_idx = 0
