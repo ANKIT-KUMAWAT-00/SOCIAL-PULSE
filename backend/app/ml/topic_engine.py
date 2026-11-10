@@ -193,3 +193,38 @@ class TopicEngine:
             vocab = []
 
         color_idx = 0
+        for i, lbl in enumerate(grouped_labels):
+            is_outlier = (lbl == -1)
+            doc_indices = [idx for idx, l in enumerate(labels) if l == lbl]
+            cluster_size = len(doc_indices)
+            percentage = round((cluster_size / total_docs) * 100, 2)
+
+            # Top Keywords via c-TF-IDF
+            if not is_outlier and c_tfidf_matrix is not None and len(vocab) > 0:
+                top_word_indices = c_tfidf_matrix[i].argsort()[::-1][:8]
+                top_keywords = [str(vocab[w]) for w in top_word_indices if c_tfidf_matrix[i][w] > 0]
+            else:
+                top_keywords = ["unclassified", "general", "noise"] if is_outlier else ["topic"]
+
+            # Formulate topic title
+            if is_outlier:
+                topic_name = "Noise & Outlier Posts"
+                color = OUTLIER_COLOR
+            else:
+                color = CLUSTER_COLORS[color_idx % len(CLUSTER_COLORS)]
+                color_idx += 1
+                meaningful_words = [w.title() for w in top_keywords[:3]]
+                topic_name = f"Topic #{lbl + 1}: " + " / ".join(meaningful_words)
+
+            # Representative exemplar posts (closest to centroid)
+            cluster_feats = features[doc_indices]
+            centroid = np.mean(cluster_feats, axis=0)
+            dists = np.linalg.norm(cluster_feats - centroid, axis=1)
+            closest_indices = [doc_indices[k] for k in dists.argsort()[:3]]
+            representative_posts = [raw_texts[k] for k in closest_indices]
+
+            cluster_info_list.append({
+                "cluster_label_id": int(lbl),
+                "name": topic_name,
+                "top_keywords": top_keywords,
+                "representative_posts": representative_posts,
