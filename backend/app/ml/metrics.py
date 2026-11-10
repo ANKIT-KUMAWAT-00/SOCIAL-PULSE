@@ -30,3 +30,30 @@ def compute_clustering_metrics(
         return {
             "silhouette_score": None,
             "davies_bouldin_score": None,
+            "calinski_harabasz_score": None,
+            "num_clusters": len([l for l in unique_labels if l != -1]),
+            "num_outliers": int(np.sum(labels == -1))
+        }
+
+    try:
+        sil = float(silhouette_score(X_eval, labels_eval))
+    except Exception:
+        sil = None
+
+    try:
+        db = float(davies_bouldin_score(X_eval, labels_eval))
+    except Exception:
+        db = None
+
+    try:
+        ch = float(calinski_harabasz_score(X_eval, labels_eval))
+    except Exception:
+        ch = None
+
+    return {
+        "silhouette_score": round(sil, 4) if sil is not None else None,
+        "davies_bouldin_score": round(db, 4) if db is not None else None,
+        "calinski_harabasz_score": round(ch, 2) if ch is not None else None,
+        "num_clusters": len([l for l in unique_labels if l != -1]),
+        "num_outliers": int(np.sum(labels == -1))
+    }
