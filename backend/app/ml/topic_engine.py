@@ -253,3 +253,39 @@ class TopicEngine:
         Returns 2D/3D coordinates, cluster assignments, metadata, and evaluation metrics.
         """
         start_time = time.time()
+        cleaned_texts = preprocess_corpus(raw_texts)
+
+        # 1. Feature Extraction
+        features = self.extract_features(raw_texts, cleaned_texts, extractor_type=feature_extractor)
+
+        # 2. Clustering
+        labels = self.cluster_data(
+            features=features,
+            algorithm=algorithm,
+            n_clusters=n_clusters,
+            min_cluster_size=min_cluster_size,
+            eps=eps,
+            min_samples=min_samples
+        )
+
+        # 3. Dimensionality Reduction (3D for 3D scatter and 2D for fallback/2D view)
+        coords_3d = self.reduce_dimensions(features, method=dim_reduction, n_components=3)
+
+        # 4. Metrics Computation
+        metrics = compute_clustering_metrics(features, labels)
+
+        # 5. Extract Cluster Interpretations & Keywords
+        cluster_summaries = self.extract_cluster_topics(cleaned_texts, raw_texts, labels, features)
+
+        duration_ms = round((time.time() - start_time) * 1000, 2)
+
+        return {
+            "labels": labels.tolist(),
+            "coords_3d": coords_3d.tolist(),
+            "cluster_summaries": cluster_summaries,
+            "metrics": metrics,
+            "duration_ms": duration_ms
+        }
+
+# Global singleton
+topic_engine = TopicEngine()
