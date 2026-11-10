@@ -228,3 +228,28 @@ class TopicEngine:
                 "name": topic_name,
                 "top_keywords": top_keywords,
                 "representative_posts": representative_posts,
+                "post_count": cluster_size,
+                "percentage": percentage,
+                "coherence_score": round(float(np.mean(1.0 / (1.0 + dists))), 3),
+                "color": color,
+                "is_outlier": is_outlier
+            })
+
+        return sorted(cluster_info_list, key=lambda x: (x["is_outlier"], -x["post_count"]))
+
+    def run_full_pipeline(
+        self,
+        raw_texts: List[str],
+        algorithm: str = "hdbscan",
+        feature_extractor: str = "embeddings",
+        n_clusters: int = 5,
+        min_cluster_size: int = 5,
+        eps: float = 0.5,
+        min_samples: int = 5,
+        dim_reduction: str = "umap"
+    ) -> Dict[str, Any]:
+        """
+        Executes end-to-end Topic Discovery pipeline.
+        Returns 2D/3D coordinates, cluster assignments, metadata, and evaluation metrics.
+        """
+        start_time = time.time()
