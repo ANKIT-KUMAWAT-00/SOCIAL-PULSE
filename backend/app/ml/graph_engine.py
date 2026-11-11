@@ -78,3 +78,28 @@ class CommunityEngine:
             partition = {n: 0 for n in G.nodes()}
             modularity = 0.0
 
+        # 3. Compute Network Centrality Metrics
+        deg_centrality = nx.degree_centrality(G)
+
+        # Approximate betweenness centrality for performance
+        k_samples = min(num_nodes, 80)
+        between_centrality = nx.betweenness_centrality(G, k=k_samples, weight="weight", seed=42)
+
+        try:
+            pagerank = nx.pagerank(G, weight="weight", alpha=0.85)
+        except Exception:
+            pagerank = {n: 1.0 / max(1, num_nodes) for n in G.nodes()}
+
+        density = float(nx.density(G))
+
+        # 4. Generate 3D Force-Directed Layout Coordinates for Three.js
+        try:
+            # 3D Spring layout positions
+            pos_3d = nx.spring_layout(G, dim=3, k=0.45, iterations=40, seed=42)
+        except Exception:
+            pos_3d = {n: [0.0, 0.0, 0.0] for n in G.nodes()}
+
+        # 5. Aggregate Community Stats
+        community_members = {}
+        for node_id, comm_id in partition.items():
+            community_members.setdefault(comm_id, []).append(node_id)
