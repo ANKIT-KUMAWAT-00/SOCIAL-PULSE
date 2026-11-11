@@ -43,3 +43,38 @@ class CommunityEngine:
                 u_id,
                 username=u.get("username", u_id),
                 followers=u.get("follower_count", 0),
+                following=u.get("following_count", 0)
+            )
+
+        # Add edges
+        for r in relationships:
+            src = r["source_user_id_str"]
+            tgt = r["target_user_id_str"]
+            wt = float(r.get("interaction_weight", 1.0))
+            if G.has_edge(src, tgt):
+                G[src][tgt]["weight"] += wt
+            else:
+                G.add_edge(src, tgt, weight=wt, rel_type=r.get("relationship_type", "follow"))
+
+        num_nodes = G.number_of_nodes()
+        num_edges = G.number_of_edges()
+
+        if num_nodes == 0:
+            return {
+                "nodes": [],
+                "edges": [],
+                "communities": [],
+                "modularity": 0.0,
+                "density": 0.0,
+                "duration_ms": 0.0
+            }
+
+        # 2. Compute Louvain Partition & Modularity
+        try:
+            partition = community_louvain.best_partition(G, resolution=resolution, weight="weight", random_state=42)
+            modularity = float(community_louvain.modularity(partition, G, weight="weight"))
+        except Exception as e:
+            print(f"[CommunityEngine] Louvain error: {e}. Fallback to single partition.")
+            partition = {n: 0 for n in G.nodes()}
+            modularity = 0.0
+
