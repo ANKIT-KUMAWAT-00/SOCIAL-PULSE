@@ -103,3 +103,23 @@ class CommunityEngine:
         community_members = {}
         for node_id, comm_id in partition.items():
             community_members.setdefault(comm_id, []).append(node_id)
+
+        community_summaries = []
+        for comm_id, members in sorted(community_members.items(), key=lambda x: -len(x[1])):
+            color = COMMUNITY_COLORS[comm_id % len(COMMUNITY_COLORS)]
+            subG = G.subgraph(members)
+            internal_density = float(nx.density(subG)) if len(members) > 1 else 1.0
+
+            community_summaries.append({
+                "community_label_id": comm_id,
+                "name": f"Community #{comm_id + 1} ({len(members)} nodes)",
+                "member_count": len(members),
+                "internal_density": round(internal_density, 3),
+                "modularity_contribution": round(modularity / max(1, len(community_members)), 4),
+                "color": color,
+                "top_discussed_topics": [] # Populated by cross-analyzer
+            })
+
+        # 6. Format Node and Edge Payloads
+        node_payloads = []
+        for n in G.nodes():
