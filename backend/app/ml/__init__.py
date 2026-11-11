@@ -6,3 +6,7 @@ from app.ml.metrics import compute_clustering_metrics
 
 __all__ = [
     "clean_social_text",
+    "preprocess_corpus",
+    "topic_engine",
+    "TopicEngine",
+    "community_engine",
