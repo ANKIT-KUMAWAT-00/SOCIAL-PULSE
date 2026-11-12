@@ -138,3 +138,15 @@ class CommunityEngine:
                 "followers": G.nodes[n].get("followers", 0),
                 "following": G.nodes[n].get("following", 0),
                 "primary_topic": "General",
+                "x": round(float(coords[0]) * 100.0, 2), # Scale for 3D world space
+                "y": round(float(coords[1]) * 100.0, 2),
+                "z": round(float(coords[2]) * 100.0, 2)
+            })
+
+        edge_payloads = []
+        for u, v, data in G.edges(data=True):
+            edge_payloads.append({
+                "source": u,
+                "target": v,
+                "weight": round(float(data.get("weight", 1.0)), 2),
+                "type": data.get("rel_type", "follow")
