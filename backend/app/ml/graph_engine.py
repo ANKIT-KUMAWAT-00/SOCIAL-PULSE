@@ -123,3 +123,18 @@ class CommunityEngine:
         # 6. Format Node and Edge Payloads
         node_payloads = []
         for n in G.nodes():
+            comm_id = partition.get(n, 0)
+            coords = pos_3d.get(n, [0.0, 0.0, 0.0])
+            color = COMMUNITY_COLORS[comm_id % len(COMMUNITY_COLORS)]
+            node_payloads.append({
+                "id": n,
+                "username": G.nodes[n].get("username", n),
+                "community_id": comm_id,
+                "community_name": f"Community #{comm_id + 1}",
+                "color": color,
+                "degree": round(float(deg_centrality.get(n, 0.0)), 4),
+                "betweenness": round(float(between_centrality.get(n, 0.0)), 4),
+                "pagerank": round(float(pagerank.get(n, 0.0)), 4),
+                "followers": G.nodes[n].get("followers", 0),
+                "following": G.nodes[n].get("following", 0),
+                "primary_topic": "General",
