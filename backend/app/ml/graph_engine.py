@@ -150,3 +150,13 @@ class CommunityEngine:
                 "target": v,
                 "weight": round(float(data.get("weight", 1.0)), 2),
                 "type": data.get("rel_type", "follow")
+            })
+
+        duration_ms = round((time.time() - start_time) * 1000, 2)
+
+        return {
+            "nodes": node_payloads,
+            "edges": edge_payloads,
+            "communities": community_summaries,
+            "modularity": round(modularity, 4),
+            "density": round(density, 4),
