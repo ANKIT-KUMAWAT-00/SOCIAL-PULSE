@@ -23,3 +23,31 @@ class CommunityRunRequest(BaseModel):
 class NetworkNode(BaseModel):
     id: str # user_id_str
     username: str
+    community_id: int
+    community_name: str
+    color: str
+    degree: float
+    betweenness: float
+    pagerank: float
+    followers: int
+    following: int
+    primary_topic: Optional[str] = "General"
+    x: float
+    y: float
+    z: float
+
+class NetworkEdge(BaseModel):
+    source: str
+    target: str
+    weight: float
+    type: str
+
+class NetworkGraphResponse(BaseModel):
+    dataset_id: int
+    nodes: List[NetworkNode]
+    edges: List[NetworkEdge]
+    communities: List[CommunityResponse]
+    modularity: float
+    density: float
+    num_nodes: int
+    num_edges: int
