@@ -18,3 +18,8 @@ class SocialUser(Base):
     primary_topic_id = Column(Integer, nullable=True) # dominant topic discovered for this user
 
     # 3D layout coordinates for network visualization
+    pos_x = Column(Float, default=0.0)
+    pos_y = Column(Float, default=0.0)
+    pos_z = Column(Float, default=0.0)
+
+    dataset = relationship("Dataset", back_populates="users")
