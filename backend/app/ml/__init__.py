@@ -10,3 +10,8 @@ __all__ = [
     "topic_engine",
     "TopicEngine",
     "community_engine",
+    "CommunityEngine",
+    "cross_analyzer",
+    "CrossAnalyzer",
+    "compute_clustering_metrics"
+]
