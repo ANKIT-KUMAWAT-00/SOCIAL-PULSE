@@ -19,3 +19,7 @@ class SocialPost(Base):
     topic_cluster_id = Column(Integer, nullable=True, index=True) # -1 for outlier, 0..K for clusters
     embedding_x = Column(Float, nullable=True) # 2D / 3D UMAP coordinate
     embedding_y = Column(Float, nullable=True)
+    embedding_z = Column(Float, nullable=True)
+    is_outlier = Column(Boolean, default=False)
+
+    dataset = relationship("Dataset", back_populates="posts")
