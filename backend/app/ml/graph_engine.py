@@ -160,3 +160,10 @@ class CommunityEngine:
             "communities": community_summaries,
             "modularity": round(modularity, 4),
             "density": round(density, 4),
+            "num_nodes": num_nodes,
+            "num_edges": num_edges,
+            "duration_ms": duration_ms
+        }
+
+# Global singleton
+community_engine = CommunityEngine()
