@@ -43,3 +43,33 @@ class CrossAnalyzer:
         num_topics = len(valid_topics)
 
         # Raw counts: matrix[comm_idx][topic_idx]
+        raw_matrix = np.zeros((num_comms, num_topics), dtype=np.float32)
+
+        # Map each user to their personal topic distribution
+        user_topic_counts = {}
+
+        for p in posts:
+            author_id = p.get("user_id") or p.get("user_id_str")
+            t_id = p.get("topic_cluster_id")
+
+            if t_id in topic_id_to_idx:
+                t_idx = topic_id_to_idx[t_id]
+                user_topic_counts.setdefault(author_id, {})
+                user_topic_counts[author_id][t_idx] = user_topic_counts[author_id].get(t_idx, 0) + 1
+
+                if author_id in user_community_map:
+                    c_id = user_community_map[author_id]
+                    if c_id in comm_id_to_idx:
+                        c_idx = comm_id_to_idx[c_id]
+                        raw_matrix[c_idx][t_idx] += 1.0
+
+        # Row-normalize (Affinity proportion: sum across topics per community = 1.0)
+        row_sums = raw_matrix.sum(axis=1, keepdims=True)
+        row_sums[row_sums == 0] = 1.0
+        normalized_matrix = raw_matrix / row_sums
+
+        # Attach top discussed topics to each community summary
+        enriched_communities = []
+        for c in valid_communities:
+            c_idx = comm_id_to_idx[c["community_label_id"]]
+            c_topics = []
