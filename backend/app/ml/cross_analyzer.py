@@ -73,3 +73,28 @@ class CrossAnalyzer:
         for c in valid_communities:
             c_idx = comm_id_to_idx[c["community_label_id"]]
             c_topics = []
+            for t_idx, val in enumerate(normalized_matrix[c_idx]):
+                if val > 0.05:
+                    c_topics.append({
+                        "topic_id": valid_topics[t_idx]["cluster_label_id"],
+                        "name": valid_topics[t_idx]["name"],
+                        "affinity": round(float(val), 3)
+                    })
+            c_topics.sort(key=lambda x: -x["affinity"])
+            c_copy = dict(c)
+            c_copy["top_discussed_topics"] = c_topics[:3]
+            enriched_communities.append(c_copy)
+
+        # Generate Natural Language Insights
+        insights = []
+
+        # Find dominant topic for each community
+        for c_idx, c in enumerate(enriched_communities):
+            best_t_idx = int(np.argmax(normalized_matrix[c_idx]))
+            affinity = normalized_matrix[c_idx][best_t_idx]
+            topic_name = valid_topics[best_t_idx]["name"]
+            if affinity >= 0.40:
+                insights.append(
+                    f"{c['name']} demonstrates high topical concentration ({round(affinity*100, 1)}%) in {topic_name}."
+                )
+
