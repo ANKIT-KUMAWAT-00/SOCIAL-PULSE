@@ -98,3 +98,21 @@ class CrossAnalyzer:
                     f"{c['name']} demonstrates high topical concentration ({round(affinity*100, 1)}%) in {topic_name}."
                 )
 
+        # Find cross-community bridge topics (topics with high presence across multiple communities)
+        topic_spread = np.count_nonzero(normalized_matrix > 0.15, axis=0)
+        for t_idx, count in enumerate(topic_spread):
+            if count >= 2:
+                insights.append(
+                    f"{valid_topics[t_idx]['name']} serves as a shared bridge topic discussed across {count} distinct communities."
+                )
+
+        if not insights:
+            insights.append("Communities show diverse, balanced cross-topic discussions without extreme polarization.")
+
+        return {
+            "topics": [
+                {
+                    "id": t["cluster_label_id"],
+                    "name": t["name"],
+                    "color": t.get("color", "#8b5cf6")
+                }
