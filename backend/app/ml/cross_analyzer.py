@@ -116,3 +116,20 @@ class CrossAnalyzer:
                     "name": t["name"],
                     "color": t.get("color", "#8b5cf6")
                 }
+                for t in valid_topics
+            ],
+            "communities": [
+                {
+                    "id": c["community_label_id"],
+                    "name": c["name"],
+                    "color": c.get("color", "#06b6d4"),
+                    "member_count": c.get("member_count", 0)
+                }
+                for c in enriched_communities
+            ],
+            "matrix": [[round(float(v), 4) for v in row] for row in normalized_matrix],
+            "insights": insights[:5]
+        }
+
+# Global singleton
+cross_analyzer = CrossAnalyzer()
