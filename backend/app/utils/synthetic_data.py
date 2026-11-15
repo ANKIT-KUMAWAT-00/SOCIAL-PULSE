@@ -108,3 +108,53 @@ def generate_synthetic_social_dataset(
     ]
 
     for i in range(num_users):
+        u_id = f"user_{i+1:03d}"
+        assigned_comm = i % num_communities
+        community_assignments[u_id] = assigned_comm
+        users_by_community[assigned_comm].append(u_id)
+
+        if i < len(user_handles):
+            username = user_handles[i]
+        else:
+            prefix = ["code", "hyper", "cyber", "data", "deep", "zen", "vector", "cloud", "pixel", "meta"][i % 10]
+            username = f"{prefix}_{assigned_comm}_{i}"
+
+        # Preferential attachment follower counts (Power law distribution)
+        base_power = random.paretovariate(1.8)
+        followers = int(max(40, min(50000, base_power * 350)))
+        following = int(random.uniform(50, min(2000, followers * 1.2)))
+
+        users.append({
+            "user_id_str": u_id,
+            "username": username,
+            "follower_count": followers,
+            "following_count": following,
+            "ground_truth_community": assigned_comm
+        })
+
+    # 2. Generate Network Relationships (Graph Edges)
+    relationships = []
+    edge_set = set()
+
+    for comm_id, member_ids in users_by_community.items():
+        # High intra-community connection probability (0.35)
+        for i, u1 in enumerate(member_ids):
+            for u2 in member_ids[i+1:]:
+                if random.random() < 0.38:
+                    rel_key = (u1, u2)
+                    if rel_key not in edge_set:
+                        edge_set.add(rel_key)
+                        weight = round(random.uniform(1.2, 5.0), 2)
+                        relationships.append({
+                            "source_user_id_str": u1,
+                            "target_user_id_str": u2,
+                            "relationship_type": random.choice(["follow", "retweet", "mention", "reply"]),
+                            "interaction_weight": weight
+                        })
+
+    # Add cross-community bridge connections (low probability 0.04)
+    all_u_ids = [u["user_id_str"] for u in users]
+    for _ in range(int(num_users * 1.5)):
+        u1 = random.choice(all_u_ids)
+        u2 = random.choice(all_u_ids)
+        if u1 != u2 and community_assignments[u1] != community_assignments[u2]:
