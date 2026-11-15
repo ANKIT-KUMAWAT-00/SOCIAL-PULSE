@@ -208,3 +208,39 @@ def generate_synthetic_social_dataset(
 
         posts.append({
             "post_id_str": p_id,
+            "user_id_str": author_id,
+            "text": post_text,
+            "timestamp": post_date,
+            "likes": likes,
+            "comments": comments,
+            "shares": shares,
+            "ground_truth_topic": chosen_topic,
+            "is_outlier": False
+        })
+
+    # Add Outlier / Noise Posts
+    for o_idx in range(num_outliers):
+        p_id = f"post_noise_{o_idx+1:03d}"
+        author = random.choice(users)
+        post_date = base_time + datetime.timedelta(days=random.uniform(0, 45))
+
+        posts.append({
+            "post_id_str": p_id,
+            "user_id_str": author["user_id_str"],
+            "text": random.choice(OUTLIER_POSTS),
+            "timestamp": post_date,
+            "likes": random.randint(1, 15),
+            "comments": random.randint(0, 3),
+            "shares": 0,
+            "ground_truth_topic": "Outlier / General",
+            "is_outlier": True
+        })
+
+    # Shuffle posts
+    random.shuffle(posts)
+
+    return {
+        "users": users,
+        "relationships": relationships,
+        "posts": posts
+    }
