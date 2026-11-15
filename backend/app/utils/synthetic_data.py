@@ -158,3 +158,53 @@ def generate_synthetic_social_dataset(
         u1 = random.choice(all_u_ids)
         u2 = random.choice(all_u_ids)
         if u1 != u2 and community_assignments[u1] != community_assignments[u2]:
+            rel_key = tuple(sorted((u1, u2)))
+            if rel_key not in edge_set:
+                edge_set.add(rel_key)
+                relationships.append({
+                    "source_user_id_str": u1,
+                    "target_user_id_str": u2,
+                    "relationship_type": random.choice(["mention", "reply", "follow"]),
+                    "interaction_weight": round(random.uniform(0.5, 2.0), 2)
+                })
+
+    # 3. Generate Posts with Realistic Topic Correlation
+    posts = []
+    base_time = datetime.datetime.utcnow() - datetime.timedelta(days=45)
+    num_outliers = int(num_posts * outlier_ratio)
+    num_regular_posts = num_posts - num_outliers
+
+    for p_idx in range(num_regular_posts):
+        p_id = f"post_{p_idx+1:04d}"
+        author = random.choice(users)
+        author_id = author["user_id_str"]
+        comm_id = community_assignments[author_id]
+
+        # 82% chance the user posts about their primary community topic,
+        # 18% chance they post about a cross-over topic
+        if random.random() < 0.82:
+            chosen_topic = topic_names[comm_id]
+        else:
+            chosen_topic = random.choice(topic_names)
+
+        topic_data = TOPIC_TEMPLATES[chosen_topic]
+        template = random.choice(topic_data["templates"])
+        # Format template with random keyword selections
+        shuffled_kw = list(topic_data["keywords"])
+        random.shuffle(shuffled_kw)
+        post_text = template.format(keywords=shuffled_kw)
+
+        # Realistic engagement
+        likes = int(random.lognormvariate(2.8, 1.1))
+        comments = int(likes * random.uniform(0.05, 0.35))
+        shares = int(likes * random.uniform(0.02, 0.20))
+
+        # Time drift
+        post_date = base_time + datetime.timedelta(
+            days=random.uniform(0, 45),
+            hours=random.uniform(0, 24),
+            minutes=random.uniform(0, 60)
+        )
+
+        posts.append({
+            "post_id_str": p_id,
