@@ -58,3 +58,53 @@ TOPIC_TEMPLATES = {
             "Testing real-time global illumination with {keywords[2]} and {keywords[1]} in {keywords[0]}. Runs at steady 60fps on RTX 4080!",
             "Writing a custom HLSL compute shader for fluid dynamics and particle simulation. Hooked up via {keywords[8]}.",
             "Procedural world generation using Voronoi diagrams and {keywords[6]}. Infinite terrain with zero stutter thanks to LOD streaming.",
+            "Optimizing draw calls and {keywords[7]} for mobile WebGL exports. Always compress textures with KTX2/Basis Universal.",
+            "Excited to showcase our indie title built with {keywords[0]} featuring dynamic {keywords[4]} and immersive {keywords[9]}.",
+            "PBR material pipeline in {keywords[5]} to {keywords[11]} export workflow. Metallic-roughness textures calibrated to real-world albedo.",
+            "Achieving buttery smooth {keywords[10]} by decoupling physics tick rate from render refresh frequency."
+        ]
+    }
+}
+
+OUTLIER_POSTS = [
+    "Just spilled boiling hot coffee all over my keyboard... great start to Monday morning.",
+    "Anyone know a good quiet cafe near downtown with reliable Wi-Fi and oat milk lattes?",
+    "Traffic on Interstate 90 is completely stopped right now. Avoid if possible!",
+    "Happy birthday to my amazing sister! Have a wonderful year ahead ❤️",
+    "What's your favorite comfort movie when you are feeling sick on the couch?",
+    "Lost my sunglasses somewhere at the park today, hoping someone turns them in to lost & found."
+]
+
+def generate_synthetic_social_dataset(
+    num_posts: int = 500,
+    num_users: int = 80,
+    outlier_ratio: float = 0.08,
+    seed: int = 42
+) -> Dict[str, List[Dict]]:
+    """
+    Generates a realistic social media graph & post dataset with:
+    - 5 ground-truth communities with dense intra-community edges
+    - Correlated topic discussions within communities
+    - Cross-community bridging edges
+    - Realistic engagement metrics, timestamps, and outlier posts
+    """
+    random.seed(seed)
+    topic_names = list(TOPIC_TEMPLATES.keys())
+    num_communities = len(topic_names)
+
+    # 1. Generate Users across 5 Communities
+    users = []
+    community_assignments = {}
+    users_by_community = {i: [] for i in range(num_communities)}
+
+    user_handles = [
+        "alex_neural", "elena_dev", "marcus_fit", "satoshi_zk", "sarah_3d",
+        "kai_systems", "maya_ml", "david_cloud", "olivia_lift", "crypto_vikram",
+        "chen_unreal", "zack_kernel", "rachel_ai", "liam_runner", "tariq_zkp",
+        "hannah_vulkan", "mateo_k8s", "priya_cv", "nathan_crossfit", "ethan_defi",
+        "yuki_shaders", "dmitri_distributed", "chloe_deeprl", "jordan_physique", "fatima_web3",
+        "lucas_indiedev", "amara_mlops", "ben_golang", "kavita_nutrition", "vitalik_fan",
+        "sam_render", "nina_scalability", "leo_nlp", "sofia_marathon", "raj_cryptography"
+    ]
+
+    for i in range(num_users):
