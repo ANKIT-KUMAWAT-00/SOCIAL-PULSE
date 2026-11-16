@@ -118,3 +118,103 @@ def execute_full_dataset_pipeline(dataset_id: int, db: Session, job_id: Optional
 
     if job_id and job:
         job.progress = 80.0
+        job.message = "Synthesizing Cross-Sectional Topic-Community Matrix..."
+        db.commit()
+
+    # Clear previous communities for this dataset
+    db.query(Community).filter(Community.dataset_id == dataset_id).delete()
+
+    # Save new Communities
+    for c in comm_res["communities"]:
+        comm_obj = Community(
+            dataset_id=dataset_id,
+            community_label_id=c["community_label_id"],
+            name=c["name"],
+            member_count=c["member_count"],
+            internal_density=c["internal_density"],
+            modularity_contribution=c["modularity_contribution"],
+            top_discussed_topics=[],
+            color=c["color"]
+        )
+        db.add(comm_obj)
+
+    # Update users with community assignments and 3D spring coordinates
+    node_map = {n["id"]: n for n in comm_res["nodes"]}
+    for u in users:
+        if u.user_id_str in node_map:
+            n = node_map[u.user_id_str]
+            u.community_id = n["community_id"]
+            u.degree_centrality = n["degree"]
+            u.betweenness_centrality = n["betweenness"]
+            u.pagerank = n["pagerank"]
+            u.pos_x = n["x"]
+            u.pos_y = n["y"]
+            u.pos_z = n["z"]
+
+    db.commit()
+
+    # 3. Cross-Analysis
+    post_dicts = [
+        {"user_id_str": p.user_id_str, "topic_cluster_id": p.topic_cluster_id}
+        for p in posts
+    ]
+    user_briefs = [
+        {"user_id_str": u.user_id_str, "community_id": u.community_id}
+        for u in users
+    ]
+    cross_res = cross_analyzer.analyze_topic_community_relationships(
+        user_briefs, post_dicts, topic_res["cluster_summaries"], comm_res["communities"]
+    )
+
+    # Update communities with top discussed topics
+    for c_info in cross_res["communities"]:
+        c_db = db.query(Community).filter(
+            Community.dataset_id == dataset_id,
+            Community.community_label_id == c_info["id"]
+        ).first()
+        if c_db:
+            c_db.top_discussed_topics = c_info.get("top_discussed_topics", [])
+
+    if job_id and job:
+        job.status = "completed"
+        job.progress = 100.0
+        job.message = "Analysis complete"
+        job.completed_at = datetime.utcnow()
+        job.result_summary = {
+            "num_topics": len(topic_res["cluster_summaries"]),
+            "num_communities": len(comm_res["communities"]),
+            "modularity": comm_res["modularity"],
+            "duration_ms": topic_res["duration_ms"] + comm_res["duration_ms"]
+        }
+
+    db.commit()
+
+@router.get("", response_model=List[DatasetResponse])
+def list_datasets(db: Session = Depends(get_db)):
+    return db.query(Dataset).order_by(Dataset.created_at.desc()).all()
+
+@router.get("/{dataset_id}", response_model=DatasetResponse)
+def get_dataset(dataset_id: int, db: Session = Depends(get_db)):
+    ds = db.query(Dataset).filter(Dataset.id == dataset_id).first()
+    if not ds:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    return ds
+
+@router.delete("/{dataset_id}")
+def delete_dataset(dataset_id: int, db: Session = Depends(get_db)):
+    ds = db.query(Dataset).filter(Dataset.id == dataset_id).first()
+    if not ds:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+    db.delete(ds)
+    db.commit()
+    return {"message": f"Dataset {dataset_id} deleted successfully"}
+
+@router.post("/synthetic", response_model=DatasetResponse)
+def create_synthetic_dataset(
+    req: SyntheticDatasetRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    # 1. Create dataset record
+    ds = Dataset(
+        name=req.name,
