@@ -38,3 +38,28 @@ def init_seed_data():
             db.commit()
             db.refresh(ds)
 
+            raw_data = generate_synthetic_social_dataset(num_posts=300, num_users=60, outlier_ratio=0.08)
+
+            for u in raw_data["users"]:
+                db.add(SocialUser(
+                    dataset_id=ds.id,
+                    user_id_str=u["user_id_str"],
+                    username=u["username"],
+                    follower_count=u["follower_count"],
+                    following_count=u["following_count"],
+                    community_id=u.get("ground_truth_community", 0)
+                ))
+
+            for r in raw_data["relationships"]:
+                db.add(UserRelationship(
+                    dataset_id=ds.id,
+                    source_user_id_str=r["source_user_id_str"],
+                    target_user_id_str=r["target_user_id_str"],
+                    interaction_weight=r["interaction_weight"],
+                    relationship_type=r["relationship_type"]
+                ))
+
+            for p in raw_data["posts"]:
+                db.add(SocialPost(
+                    dataset_id=ds.id,
+                    post_id_str=p["post_id_str"],
