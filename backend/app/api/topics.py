@@ -108,3 +108,107 @@ def get_topic_detail(cluster_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Topic cluster not found")
     return tc
 
+@router.post("/run", response_model=TopicVisualizationResponse)
+def run_topic_clustering(req: TopicRunRequest, db: Session = Depends(get_db)):
+    ds = db.query(Dataset).filter(Dataset.id == req.dataset_id).first()
+    if not ds:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    posts = db.query(SocialPost).filter(SocialPost.dataset_id == req.dataset_id).all()
+    if not posts:
+        raise HTTPException(status_code=400, detail="No posts available for clustering")
+
+    raw_texts = [p.text for p in posts]
+    res = topic_engine.run_full_pipeline(
+        raw_texts=raw_texts,
+        algorithm=req.algorithm,
+        feature_extractor=req.feature_extractor,
+        n_clusters=req.n_clusters or 5,
+        min_cluster_size=req.min_cluster_size or 5,
+        eps=req.eps or 0.5,
+        min_samples=req.min_samples or 5,
+        dim_reduction=req.dim_reduction or "umap"
+    )
+
+    # Replace previous topic clusters
+    db.query(TopicCluster).filter(TopicCluster.dataset_id == req.dataset_id).delete()
+
+    created_clusters = []
+    cluster_color_map = {}
+    cluster_name_map = {}
+
+    for t in res["cluster_summaries"]:
+        tc = TopicCluster(
+            dataset_id=req.dataset_id,
+            cluster_label_id=t["cluster_label_id"],
+            name=t["name"],
+            top_keywords=t["top_keywords"],
+            representative_posts=t["representative_posts"],
+            post_count=t["post_count"],
+            percentage=t["percentage"],
+            coherence_score=t["coherence_score"],
+            color=t["color"]
+        )
+        db.add(tc)
+        created_clusters.append(tc)
+        cluster_color_map[t["cluster_label_id"]] = t["color"]
+        cluster_name_map[t["cluster_label_id"]] = t["name"]
+
+    # Update posts
+    labels = res["labels"]
+    coords = res["coords_3d"]
+    points = []
+
+    for i, p in enumerate(posts):
+        lbl = labels[i]
+        p.topic_cluster_id = lbl
+        p.is_outlier = (lbl == -1)
+        p.embedding_x = float(coords[i][0])
+        p.embedding_y = float(coords[i][1])
+        p.embedding_z = float(coords[i][2]) if len(coords[i]) > 2 else 0.0
+
+        points.append(TopicScatterPoint(
+            id=p.id,
+            post_id=p.post_id_str,
+            user_id=p.user_id_str,
+            text=p.text,
+            topic_cluster_id=lbl,
+            topic_name=cluster_name_map.get(lbl, "Unknown"),
+            color=cluster_color_map.get(lbl, "#64748b"),
+            x=p.embedding_x,
+            y=p.embedding_y,
+            z=p.embedding_z,
+            is_outlier=p.is_outlier,
+            likes=p.likes,
+            comments=p.comments
+        ))
+
+    db.commit()
+
+    cluster_responses = [
+        TopicClusterResponse(
+            id=c.id or 0,
+            dataset_id=c.dataset_id,
+            cluster_label_id=c.cluster_label_id,
+            name=c.name,
+            top_keywords=c.top_keywords,
+            representative_posts=c.representative_posts,
+            post_count=c.post_count,
+            percentage=c.percentage,
+            coherence_score=c.coherence_score,
+            color=c.color
+        )
+        for c in created_clusters
+    ]
+
+    return TopicVisualizationResponse(
+        dataset_id=req.dataset_id,
+        algorithm=req.algorithm,
+        total_points=len(points),
+        num_clusters=res["metrics"]["num_clusters"],
+        outliers_count=res["metrics"]["num_outliers"],
+        clusters=cluster_responses,
+        points=points
+    )
+
+
