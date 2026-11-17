@@ -218,3 +218,103 @@ def create_synthetic_dataset(
     # 1. Create dataset record
     ds = Dataset(
         name=req.name,
+        description=req.description,
+        is_synthetic=True,
+        num_posts=req.num_posts,
+        num_users=req.num_users
+    )
+    db.add(ds)
+    db.commit()
+    db.refresh(ds)
+
+    # 2. Generate synthetic data
+    raw_data = generate_synthetic_social_dataset(
+        num_posts=req.num_posts,
+        num_users=req.num_users,
+        outlier_ratio=req.outlier_ratio
+    )
+
+    # 3. Insert users
+    for u in raw_data["users"]:
+        user_obj = SocialUser(
+            dataset_id=ds.id,
+            user_id_str=u["user_id_str"],
+            username=u["username"],
+            follower_count=u["follower_count"],
+            following_count=u["following_count"],
+            community_id=u.get("ground_truth_community", 0)
+        )
+        db.add(user_obj)
+
+    # 4. Insert relationships
+    for r in raw_data["relationships"]:
+        rel_obj = UserRelationship(
+            dataset_id=ds.id,
+            source_user_id_str=r["source_user_id_str"],
+            target_user_id_str=r["target_user_id_str"],
+            relationship_type=r["relationship_type"],
+            interaction_weight=r["interaction_weight"]
+        )
+        db.add(rel_obj)
+
+    # 5. Insert posts
+    for p in raw_data["posts"]:
+        post_obj = SocialPost(
+            dataset_id=ds.id,
+            post_id_str=p["post_id_str"],
+            user_id_str=p["user_id_str"],
+            text=p["text"],
+            cleaned_text=clean_social_text(p["text"]),
+            timestamp=p["timestamp"],
+            likes=p["likes"],
+            comments=p["comments"],
+            shares=p["shares"],
+            is_outlier=p["is_outlier"]
+        )
+        db.add(post_obj)
+
+    ds.num_relationships = len(raw_data["relationships"])
+    db.commit()
+
+    # 6. Execute full initial ML pipeline synchronously so dataset is immediately ready for exploration
+    execute_full_dataset_pipeline(ds.id, db)
+    db.refresh(ds)
+    return ds
+
+@router.post("/upload", response_model=DatasetResponse)
+async def upload_dataset(
+    file: UploadFile = File(...),
+    name: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    dataset_name = name or file.filename.rsplit(".", 1)[0]
+    filename = f"{uuid.uuid4().hex}_{file.filename}"
+    file_path = str(UPLOAD_DIR / filename)
+
+    content = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    posts_to_insert = []
+    users_to_insert = []
+    rels_to_insert = []
+
+    # Parse JSON or CSV
+    if file.filename.endswith(".json"):
+        try:
+            data = json.loads(content.decode("utf-8"))
+            if isinstance(data, dict):
+                posts_raw = data.get("posts", [])
+                users_raw = data.get("users", [])
+                rels_raw = data.get("relationships", [])
+            elif isinstance(data, list):
+                posts_raw = data
+                users_raw = []
+                rels_raw = []
+            else:
+                raise ValueError("Invalid JSON structure")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to parse JSON: {e}")
+
+        for idx, p in enumerate(posts_raw):
