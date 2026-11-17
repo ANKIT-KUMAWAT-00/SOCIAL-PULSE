@@ -113,3 +113,104 @@ def get_network_graph(
         num_nodes=len(nodes),
         num_edges=len(edges)
     )
+
+@router.get("/{community_id}", response_model=CommunityResponse)
+def get_community_detail(community_id: int, db: Session = Depends(get_db)):
+    c = db.query(Community).filter(Community.id == community_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Community not found")
+    return c
+
+@router.post("/run", response_model=NetworkGraphResponse)
+def run_community_detection(
+    req: CommunityRunRequest,
+    db: Session = Depends(get_db)
+):
+    ds = db.query(Dataset).filter(Dataset.id == req.dataset_id).first()
+    if not ds:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    users = db.query(SocialUser).filter(SocialUser.dataset_id == req.dataset_id).all()
+    rels = db.query(UserRelationship).filter(UserRelationship.dataset_id == req.dataset_id).all()
+
+    user_dicts = [
+        {
+            "user_id_str": u.user_id_str,
+            "username": u.username,
+            "follower_count": u.follower_count,
+            "following_count": u.following_count
+        }
+        for u in users
+    ]
+    rel_dicts = [
+        {
+            "source_user_id_str": r.source_user_id_str,
+            "target_user_id_str": r.target_user_id_str,
+            "interaction_weight": r.interaction_weight,
+            "relationship_type": r.relationship_type
+        }
+        for r in rels
+    ]
+
+    res = community_engine.run_community_pipeline(user_dicts, rel_dicts, resolution=req.resolution)
+
+    # Replace communities
+    db.query(Community).filter(Community.dataset_id == req.dataset_id).delete()
+
+    created_comms = []
+    for c in res["communities"]:
+        c_obj = Community(
+            dataset_id=req.dataset_id,
+            community_label_id=c["community_label_id"],
+            name=c["name"],
+            member_count=c["member_count"],
+            internal_density=c["internal_density"],
+            modularity_contribution=c["modularity_contribution"],
+            top_discussed_topics=[],
+            color=c["color"]
+        )
+        db.add(c_obj)
+        created_comms.append(c_obj)
+
+    # Update users
+    node_map = {n["id"]: n for n in res["nodes"]}
+    for u in users:
+        if u.user_id_str in node_map:
+            n = node_map[u.user_id_str]
+            u.community_id = n["community_id"]
+            u.degree_centrality = n["degree"]
+            u.betweenness_centrality = n["betweenness"]
+            u.pagerank = n["pagerank"]
+            u.pos_x = n["x"]
+            u.pos_y = n["y"]
+            u.pos_z = n["z"]
+
+    db.commit()
+
+    comm_responses = [
+        CommunityResponse(
+            id=c.id or 0,
+            dataset_id=c.dataset_id,
+            community_label_id=c.community_label_id,
+            name=c.name,
+            member_count=c.member_count,
+            internal_density=c.internal_density,
+            modularity_contribution=c.modularity_contribution,
+            top_discussed_topics=[],
+            color=c.color
+        )
+        for c in created_comms
+    ]
+
+    return NetworkGraphResponse(
+        dataset_id=req.dataset_id,
+        nodes=[NetworkNode(**n) for n in res["nodes"]],
+        edges=[NetworkEdge(**e) for e in res["edges"]],
+        communities=comm_responses,
+        modularity=res["modularity"],
+        density=res["density"],
+        num_nodes=res["num_nodes"],
+        num_edges=res["num_edges"]
+    )
+
+
