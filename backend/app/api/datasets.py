@@ -318,3 +318,120 @@ async def upload_dataset(
             raise HTTPException(status_code=400, detail=f"Failed to parse JSON: {e}")
 
         for idx, p in enumerate(posts_raw):
+            text = p.get("text", "")
+            if not text:
+                continue
+            u_id = str(p.get("user_id") or p.get("user_id_str") or f"user_{idx % 20}")
+            posts_to_insert.append({
+                "post_id_str": str(p.get("post_id") or f"p_{idx}"),
+                "user_id_str": u_id,
+                "text": text,
+                "likes": int(p.get("likes", 0)),
+                "comments": int(p.get("comments", 0)),
+                "shares": int(p.get("shares", 0))
+            })
+
+        for u in users_raw:
+            users_to_insert.append({
+                "user_id_str": str(u.get("user_id_str") or u.get("id")),
+                "username": str(u.get("username", u.get("user_id_str"))),
+                "follower_count": int(u.get("follower_count", 100)),
+                "following_count": int(u.get("following_count", 100))
+            })
+
+        for r in rels_raw:
+            rels_to_insert.append({
+                "source_user_id_str": str(r.get("source_user_id_str") or r.get("source")),
+                "target_user_id_str": str(r.get("target_user_id_str") or r.get("target")),
+                "interaction_weight": float(r.get("interaction_weight", 1.0)),
+                "relationship_type": str(r.get("relationship_type", "follow"))
+            })
+
+    elif file.filename.endswith(".csv"):
+        try:
+            df = pd.read_csv(file_path)
+            # Check column names
+            text_col = next((c for c in df.columns if c.lower() in ["text", "post", "content", "tweet"]), None)
+            if not text_col:
+                raise HTTPException(status_code=400, detail="CSV must contain a 'text' or 'content' column.")
+
+            user_col = next((c for c in df.columns if c.lower() in ["user_id", "author_id", "username", "user"]), None)
+
+            for idx, row in df.iterrows():
+                txt = str(row[text_col])
+                if not txt or txt.lower() == "nan":
+                    continue
+                uid = str(row[user_col]) if user_col else f"user_{idx % 25}"
+                posts_to_insert.append({
+                    "post_id_str": f"p_{idx}",
+                    "user_id_str": uid,
+                    "text": txt,
+                    "likes": int(row.get("likes", 0)) if "likes" in row else 0,
+                    "comments": int(row.get("comments", 0)) if "comments" in row else 0,
+                    "shares": int(row.get("shares", 0)) if "shares" in row else 0
+                })
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to parse CSV: {e}")
+
+    # Deduce unique users if not explicitly provided
+    if not users_to_insert:
+        unique_uids = set(p["user_id_str"] for p in posts_to_insert)
+        for u_id in unique_uids:
+            users_to_insert.append({
+                "user_id_str": u_id,
+                "username": f"user_{u_id}",
+                "follower_count": 150,
+                "following_count": 100
+            })
+
+    # Create dataset record
+    ds = Dataset(
+        name=dataset_name,
+        description=description or f"Uploaded dataset with {len(posts_to_insert)} posts",
+        file_path=file_path,
+        is_synthetic=False,
+        num_posts=len(posts_to_insert),
+        num_users=len(users_to_insert),
+        num_relationships=len(rels_to_insert)
+    )
+    db.add(ds)
+    db.commit()
+    db.refresh(ds)
+
+    for u in users_to_insert:
+        db.add(SocialUser(
+            dataset_id=ds.id,
+            user_id_str=u["user_id_str"],
+            username=u["username"],
+            follower_count=u["follower_count"],
+            following_count=u["following_count"]
+        ))
+
+    for r in rels_to_insert:
+        db.add(UserRelationship(
+            dataset_id=ds.id,
+            source_user_id_str=r["source_user_id_str"],
+            target_user_id_str=r["target_user_id_str"],
+            interaction_weight=r["interaction_weight"],
+            relationship_type=r["relationship_type"]
+        ))
+
+    for p in posts_to_insert:
+        db.add(SocialPost(
+            dataset_id=ds.id,
+            post_id_str=p["post_id_str"],
+            user_id_str=p["user_id_str"],
+            text=p["text"],
+            cleaned_text=clean_social_text(p["text"]),
+            timestamp=datetime.utcnow(),
+            likes=p["likes"],
+            comments=p["comments"],
+            shares=p["shares"]
+        ))
+
+    db.commit()
+
+    # Run ML analysis
+    execute_full_dataset_pipeline(ds.id, db)
+    db.refresh(ds)
+    return ds
