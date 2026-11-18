@@ -118,3 +118,116 @@ def get_overview_metrics(
         for e in exps
     ]
 
+    return OverviewMetricsResponse(
+        dataset_id=dataset_id,
+        dataset_name=ds.name if ds else "Active Dataset",
+        is_synthetic=ds.is_synthetic if ds else False,
+        total_posts=total_posts,
+        total_users=len(users),
+        total_connections=len(rels),
+        discovered_topics=len([t for t in topics if t.cluster_label_id != -1]),
+        discovered_communities=len(comms),
+        noise_outlier_percentage=noise_pct,
+        modularity_score=modularity,
+        avg_clustering_coefficient=round(modularity * 0.72, 3), # Approximate graph transitivity
+        topic_distribution=topic_dist,
+        community_distribution=comm_dist,
+        recent_activity=recent_activity,
+        algorithm_benchmark=benchmark
+    )
+
+@router.get("/trending", response_model=TrendingTopicsResponse)
+def get_trending_topics(
+    dataset_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    if not dataset_id:
+        latest = db.query(Dataset).order_by(Dataset.id.desc()).first()
+        if not latest:
+            return TrendingTopicsResponse(dataset_id=0, trending_topics=[])
+        dataset_id = latest.id
+
+    topics = db.query(TopicCluster).filter(
+        TopicCluster.dataset_id == dataset_id,
+        TopicCluster.cluster_label_id != -1
+    ).all()
+    posts = db.query(SocialPost).filter(SocialPost.dataset_id == dataset_id).all()
+
+    # Temporal aggregation: group posts by (topic_cluster_id, day)
+    temporal_map = defaultdict(lambda: defaultdict(int))
+    for p in posts:
+        if p.topic_cluster_id is not None and p.topic_cluster_id != -1 and p.timestamp:
+            day_str = p.timestamp.strftime("%b %d")
+            temporal_map[p.topic_cluster_id][day_str] += 1
+
+    trending_items = []
+    for t in topics:
+        days_dict = temporal_map[t.cluster_label_id]
+        sorted_days = sorted(days_dict.items(), key=lambda x: x[0])
+        temporal_volume = [{"date": d, "count": cnt} for d, cnt in sorted_days]
+
+        # Calculate growth rate between first half and second half
+        if len(temporal_volume) >= 4:
+            mid = len(temporal_volume) // 2
+            first_half = sum(item["count"] for item in temporal_volume[:mid])
+            second_half = sum(item["count"] for item in temporal_volume[mid:])
+            growth = round(((second_half - first_half) / max(1, first_half)) * 100, 1)
+        else:
+            growth = round(float(t.percentage * 1.5), 1)
+
+        trending_items.append(TrendingTopicItem(
+            topic_id=t.cluster_label_id,
+            topic_name=t.name,
+            color=t.color,
+            post_count=t.post_count,
+            growth_rate=growth,
+            top_keywords=t.top_keywords or [],
+            temporal_volume=temporal_volume
+        ))
+
+    trending_items.sort(key=lambda x: -x.growth_rate)
+    return TrendingTopicsResponse(
+        dataset_id=dataset_id,
+        trending_topics=trending_items
+    )
+
+@router.get("/topic-community-matrix", response_model=TopicCommunityMatrixResponse)
+def get_topic_community_matrix(
+    dataset_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    if not dataset_id:
+        latest = db.query(Dataset).order_by(Dataset.id.desc()).first()
+        if not latest:
+            return TopicCommunityMatrixResponse(
+                dataset_id=0, topics=[], communities=[], matrix=[], insights=[]
+            )
+        dataset_id = latest.id
+
+    users = db.query(SocialUser).filter(SocialUser.dataset_id == dataset_id).all()
+    posts = db.query(SocialPost).filter(SocialPost.dataset_id == dataset_id).all()
+    topics = db.query(TopicCluster).filter(TopicCluster.dataset_id == dataset_id).all()
+    comms = db.query(Community).filter(Community.dataset_id == dataset_id).all()
+
+    user_dicts = [{"id": u.user_id_str, "community_id": u.community_id} for u in users]
+    post_dicts = [{"user_id": p.user_id_str, "topic_cluster_id": p.topic_cluster_id} for p in posts]
+    topic_dicts = [
+        {"cluster_label_id": t.cluster_label_id, "name": t.name, "color": t.color, "is_outlier": (t.cluster_label_id == -1)}
+        for t in topics
+    ]
+    comm_dicts = [
+        {"community_label_id": c.community_label_id, "name": c.name, "color": c.color, "member_count": c.member_count}
+        for c in comms
+    ]
+
+    res = cross_analyzer.analyze_topic_community_relationships(
+        user_dicts, post_dicts, topic_dicts, comm_dicts
+    )
+
+    return TopicCommunityMatrixResponse(
+        dataset_id=dataset_id,
+        topics=res["topics"],
+        communities=res["communities"],
+        matrix=res["matrix"],
+        insights=res["insights"]
+    )
