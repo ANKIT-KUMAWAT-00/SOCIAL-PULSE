@@ -68,3 +68,61 @@ def run_experiment(req: ExperimentRunRequest, db: Session = Depends(get_db)):
             execution_time_ms=duration_ms,
             num_clusters=len(res["communities"]),
             num_outliers=0,
+            modularity=res["modularity"],
+            metrics_summary={
+                "density": res["density"],
+                "num_nodes": res["num_nodes"],
+                "num_edges": res["num_edges"]
+            }
+        )
+        db.add(exp)
+        db.commit()
+        db.refresh(exp)
+        return exp
+
+    else:
+        # Topic clustering experiment (K-Means, DBSCAN, HDBSCAN)
+        posts = db.query(SocialPost).filter(SocialPost.dataset_id == req.dataset_id).all()
+        if not posts:
+            raise HTTPException(status_code=400, detail="No posts available for clustering")
+
+        raw_texts = [p.text for p in posts]
+        feature_extractor = req.parameters.get("feature_extractor", "embeddings")
+        dim_reduction = req.parameters.get("dim_reduction", "umap")
+        n_clusters = int(req.parameters.get("n_clusters", 5))
+        min_cluster_size = int(req.parameters.get("min_cluster_size", 5))
+        eps = float(req.parameters.get("eps", 0.5))
+        min_samples = int(req.parameters.get("min_samples", 5))
+
+        res = topic_engine.run_full_pipeline(
+            raw_texts=raw_texts,
+            algorithm=algo,
+            feature_extractor=feature_extractor,
+            n_clusters=n_clusters,
+            min_cluster_size=min_cluster_size,
+            eps=eps,
+            min_samples=min_samples,
+            dim_reduction=dim_reduction
+        )
+
+        metrics = res["metrics"]
+        duration_ms = res["duration_ms"]
+
+        exp = MLExperiment(
+            dataset_id=req.dataset_id,
+            name=req.name or f"{algo.upper()} ({feature_extractor.title()})",
+            algorithm_type=algo,
+            pipeline_type="topic",
+            parameters=req.parameters,
+            execution_time_ms=duration_ms,
+            num_clusters=metrics["num_clusters"],
+            num_outliers=metrics["num_outliers"],
+            silhouette_score=metrics.get("silhouette_score"),
+            davies_bouldin_score=metrics.get("davies_bouldin_score"),
+            calinski_harabasz_score=metrics.get("calinski_harabasz_score"),
+            metrics_summary=metrics
+        )
+        db.add(exp)
+        db.commit()
+        db.refresh(exp)
+        return exp
