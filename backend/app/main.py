@@ -63,3 +63,66 @@ def init_seed_data():
                 db.add(SocialPost(
                     dataset_id=ds.id,
                     post_id_str=p["post_id_str"],
+                    user_id_str=p["user_id_str"],
+                    text=p["text"],
+                    cleaned_text=clean_social_text(p["text"]),
+                    timestamp=p["timestamp"],
+                    likes=p["likes"],
+                    comments=p["comments"],
+                    shares=p["shares"],
+                    is_outlier=p["is_outlier"]
+                ))
+
+            ds.num_relationships = len(raw_data["relationships"])
+            db.commit()
+
+            # Run ML analysis
+            execute_full_dataset_pipeline(ds.id, db)
+            print("[SocialPulse] Initial benchmark dataset seeded and analyzed successfully.")
+    except Exception as e:
+        print(f"[SocialPulse] Startup seeding error: {e}")
+    finally:
+        db.close()
+
+# Seed upon load
+init_seed_data()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    description="SocialPulse — Social Media Topic & Community Clustering Intelligence Platform",
+    lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount Routers under /api
+app.include_router(datasets_router, prefix=settings.API_V1_STR)
+app.include_router(topics_router, prefix=settings.API_V1_STR)
+app.include_router(communities_router, prefix=settings.API_V1_STR)
+app.include_router(analytics_router, prefix=settings.API_V1_STR)
+app.include_router(experiments_router, prefix=settings.API_V1_STR)
+app.include_router(jobs_router, prefix=settings.API_V1_STR)
+
+@app.get("/")
+def root():
+    return {
+        "app": "SocialPulse Intelligence Platform",
+        "version": settings.VERSION,
+        "team": [
+            {"name": "Konala Venkata Sri Sai Surya", "reg_no": "12404306"},
+            {"name": "Ankit Kumawat", "reg_no": "12406586"},
+            {"name": "Bhavya Nasa", "reg_no": "12405762"}
+        ],
+        "docs": "/docs"
+    }
