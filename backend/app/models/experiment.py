@@ -12,3 +12,14 @@ class MLExperiment(Base):
     algorithm_type = Column(String(64), nullable=False) # "kmeans", "dbscan", "hdbscan", "louvain"
     pipeline_type = Column(String(64), default="topic") # "topic" or "community"
     parameters = Column(JSON, default=dict) # e.g. {"n_clusters": 5, "eps": 0.5, "metric": "cosine"}
+    execution_time_ms = Column(Float, default=0.0)
+    num_clusters = Column(Integer, default=0)
+    num_outliers = Column(Integer, default=0)
+    silhouette_score = Column(Float, nullable=True)
+    davies_bouldin_score = Column(Float, nullable=True)
+    calinski_harabasz_score = Column(Float, nullable=True)
+    modularity = Column(Float, nullable=True)
+    metrics_summary = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    dataset = relationship("Dataset", back_populates="experiments")
