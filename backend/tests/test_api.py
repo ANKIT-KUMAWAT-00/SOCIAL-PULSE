@@ -63,3 +63,35 @@ def test_datasets_and_pipeline():
     # 5. Trending Topics
     tr_res = client.get(f"/api/analytics/trending?dataset_id={ds_id}")
     assert tr_res.status_code == 200
+    tr_data = tr_res.json()
+    assert len(tr_data["trending_topics"]) > 0
+
+    # 6. Topic-Community Matrix
+    m_res = client.get(f"/api/analytics/topic-community-matrix?dataset_id={ds_id}")
+    assert m_res.status_code == 200
+    m_data = m_res.json()
+    assert len(m_data["topics"]) > 0
+    assert len(m_data["communities"]) > 0
+    assert len(m_data["matrix"]) > 0
+    assert len(m_data["insights"]) > 0
+
+def test_ml_experiment_run():
+    datasets = client.get("/api/datasets").json()
+    ds_id = datasets[0]["id"]
+
+    # Run K-Means experiment
+    exp_res = client.post("/api/experiments/run", json={
+        "dataset_id": ds_id,
+        "name": "K-Means k=4 Benchmark",
+        "algorithm_type": "kmeans",
+        "pipeline_type": "topic",
+        "parameters": {
+            "n_clusters": 4,
+            "feature_extractor": "embeddings"
+        }
+    })
+    assert exp_res.status_code == 200
+    exp_data = exp_res.json()
+    assert exp_data["num_clusters"] == 4
+    assert exp_data["silhouette_score"] is not None
+    assert exp_data["execution_time_ms"] > 0
