@@ -14,3 +14,12 @@ class Dataset(Base):
     num_users = Column(Integer, default=0)
     num_relationships = Column(Integer, default=0)
     is_synthetic = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    posts = relationship("SocialPost", back_populates="dataset", cascade="all, delete-orphan")
+    users = relationship("SocialUser", back_populates="dataset", cascade="all, delete-orphan")
+    relationships = relationship("UserRelationship", back_populates="dataset", cascade="all, delete-orphan")
+    topics = relationship("TopicCluster", back_populates="dataset", cascade="all, delete-orphan")
+    communities = relationship("Community", back_populates="dataset", cascade="all, delete-orphan")
+    experiments = relationship("MLExperiment", back_populates="dataset", cascade="all, delete-orphan")
+    jobs = relationship("ProcessingJob", back_populates="dataset", cascade="all, delete-orphan")
