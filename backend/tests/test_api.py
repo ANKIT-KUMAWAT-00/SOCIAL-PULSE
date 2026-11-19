@@ -33,3 +33,33 @@ def test_datasets_and_pipeline():
     ov_data = ov_res.json()
     assert ov_data["total_posts"] > 0
     assert ov_data["total_users"] > 0
+    assert ov_data["discovered_topics"] > 0
+    assert ov_data["discovered_communities"] > 0
+    assert "topic_distribution" in ov_data
+    assert "community_distribution" in ov_data
+
+    # 3. Topic Visualization
+    t_res = client.get(f"/api/topics/visualization?dataset_id={ds_id}")
+    assert t_res.status_code == 200
+    t_data = t_res.json()
+    assert len(t_data["clusters"]) > 0
+    assert len(t_data["points"]) > 0
+    # verify 3D coordinates exist on scatter points
+    sample_pt = t_data["points"][0]
+    assert "x" in sample_pt and "y" in sample_pt and "z" in sample_pt
+
+    # 4. Community Network Graph
+    c_res = client.get(f"/api/communities/network?dataset_id={ds_id}")
+    assert c_res.status_code == 200
+    c_data = c_res.json()
+    assert len(c_data["nodes"]) > 0
+    assert len(c_data["edges"]) > 0
+    sample_node = c_data["nodes"][0]
+    assert "pagerank" in sample_node
+    assert "degree" in sample_node
+    assert "betweenness" in sample_node
+    assert "x" in sample_node and "y" in sample_node and "z" in sample_node
+
+    # 5. Trending Topics
+    tr_res = client.get(f"/api/analytics/trending?dataset_id={ds_id}")
+    assert tr_res.status_code == 200
