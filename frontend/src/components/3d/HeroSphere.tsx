@@ -88,3 +88,98 @@ function ParticleNetworkSphere({ count = 220 }: { count?: number }) {
       // Mouse parallax tilt
       const targetX = (state.mouse.y * Math.PI) / 10;
       const targetY = (state.mouse.x * Math.PI) / 8;
+      groupRef.current.rotation.x += (targetX - groupRef.current.rotation.x) * 0.05;
+      groupRef.current.rotation.y += (targetY - groupRef.current.rotation.y) * 0.05;
+    }
+  });
+
+  return (
+    <group ref={groupRef}>
+      {/* Nodes */}
+      <points ref={pointsRef}>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            count={positions.length / 3}
+            array={positions}
+            itemSize={3}
+          />
+          <bufferAttribute
+            attach="attributes-color"
+            count={colors.length / 3}
+            array={colors}
+            itemSize={3}
+          />
+        </bufferGeometry>
+        <pointsMaterial
+          size={0.14}
+          vertexColors
+          transparent
+          opacity={0.92}
+          blending={THREE.AdditiveBlending}
+        />
+      </points>
+
+      {/* Network Edges */}
+      <lineSegments ref={linesRef}>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            count={linePositions.length / 3}
+            array={linePositions}
+            itemSize={3}
+          />
+          <bufferAttribute
+            attach="attributes-color"
+            count={lineColors.length / 3}
+            array={lineColors}
+            itemSize={3}
+          />
+        </bufferGeometry>
+        <lineBasicMaterial
+          vertexColors
+          transparent
+          opacity={0.32}
+          blending={THREE.AdditiveBlending}
+        />
+      </lineSegments>
+
+      {/* Ambient Inner Core Glow */}
+      <mesh>
+        <sphereGeometry args={[2.0, 32, 32]} />
+        <meshBasicMaterial
+          color="#8b5cf6"
+          transparent
+          opacity={0.04}
+          wireframe
+        />
+      </mesh>
+    </group>
+  );
+}
+
+export function HeroSphere() {
+  return (
+    <div className="w-full h-full relative cursor-grab active:cursor-grabbing">
+      <Canvas
+        camera={{ position: [0, 0, 7.5], fov: 45 }}
+        gl={{ antialias: true, alpha: true }}
+      >
+        <ambientLight intensity={0.5} />
+        <pointLight position={[10, 10, 10]} intensity={1.5} color="#8b5cf6" />
+        <pointLight position={[-10, -10, -10]} intensity={1.2} color="#06b6d4" />
+        <Float speed={1.5} rotationIntensity={0.2} floatIntensity={0.4}>
+          <ParticleNetworkSphere count={240} />
+        </Float>
+        <OrbitControls
+          enableZoom={false}
+          enablePan={false}
+          autoRotate
+          autoRotateSpeed={0.6}
+          maxPolarAngle={Math.PI / 1.5}
+          minPolarAngle={Math.PI / 3}
+        />
+      </Canvas>
+    </div>
+  );
+}
