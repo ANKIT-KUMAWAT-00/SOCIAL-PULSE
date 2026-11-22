@@ -118,3 +118,123 @@ function GraphScene({
               onClick={(e) => {
                 e.stopPropagation();
                 setSelectedNode(isSelected ? null : node);
+              }}
+            >
+              <sphereGeometry args={[1, 16, 16]} />
+              <meshStandardMaterial
+                color={isSelected ? "#f59e0b" : node.color}
+                emissive={isSelected ? "#f59e0b" : node.color}
+                emissiveIntensity={isHovered || isSelected ? 0.8 : 0.25}
+                transparent
+                opacity={opacity}
+                roughness={0.2}
+                metalness={0.8}
+              />
+            </mesh>
+
+            {/* Label for influential nodes or on hover */}
+            {(isHovered || isSelected || node.pagerank > 0.04) && matchesCommunity && (
+              <Html distanceFactor={60} position={[0, scale + 1.5, 0]} center>
+                <div
+                  className={`pointer-events-none px-2.5 py-1 rounded-md text-xs font-mono font-medium backdrop-blur-md transition-all shadow-lg whitespace-nowrap ${
+                    isSelected
+                      ? "bg-amber-500/90 text-black border border-amber-300"
+                      : isHovered
+                      ? "bg-midnight-800/90 text-cyan-300 border border-cyan-500/50"
+                      : "bg-midnight-900/75 text-gray-300 border border-white/10"
+                  }`}
+                >
+                  @{node.username}
+                </div>
+              </Html>
+            )}
+          </group>
+        );
+      })}
+
+      <OrbitControls
+        enableDamping
+        dampingFactor={0.05}
+        rotateSpeed={0.8}
+        zoomSpeed={1.0}
+        maxDistance={250}
+        minDistance={10}
+      />
+    </>
+  );
+}
+
+export function NetworkGraph3D({
+  nodes,
+  edges,
+  communities,
+  onSelectNode,
+}: NetworkGraph3DProps) {
+  const [selectedCommunity, setSelectedCommunity] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
+  const [viewMode, setViewMode] = useState<"3d" | "2d">("3d");
+
+  const hoveredNode = useMemo(
+    () => (hoveredNodeId ? nodes.find((n) => n.id === hoveredNodeId) : null),
+    [hoveredNodeId, nodes]
+  );
+
+  const activeNode = selectedNode || hoveredNode;
+
+  const handleSelect = (node: NetworkNode | null) => {
+    setSelectedNode(node);
+    if (onSelectNode) onSelectNode(node);
+  };
+
+  return (
+    <div className="relative w-full h-[620px] rounded-2xl overflow-hidden bg-midnight-950 border border-surface-border shadow-glow-card">
+      {/* Top Interactive HUD Bar */}
+      <div className="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
+        {/* Left: Community Filter Pills */}
+        <div className="flex flex-wrap items-center gap-2 pointer-events-auto bg-midnight-900/80 p-1.5 rounded-xl backdrop-blur-md border border-surface-border">
+          <button
+            onClick={() => setSelectedCommunity(null)}
+            className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+              selectedCommunity === null
+                ? "bg-violet-glow text-white shadow-glow-violet"
+                : "text-gray-400 hover:text-white"
+            }`}
+          >
+            All Communities ({communities.length})
+          </button>
+          {communities.map((c) => (
+            <button
+              key={c.community_label_id}
+              onClick={() =>
+                setSelectedCommunity(
+                  selectedCommunity === c.community_label_id ? null : c.community_label_id
+                )
+              }
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all ${
+                selectedCommunity === c.community_label_id
+                  ? "bg-white/15 text-white border border-white/30"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: c.color }}
+              />
+              {c.name.split(" ")[0]} ({c.member_count})
+            </button>
+          ))}
+        </div>
+
+        {/* Right: Search & View Toggle */}
+        <div className="flex items-center gap-2 pointer-events-auto">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search user node..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-midnight-900/80 backdrop-blur-md border border-surface-border rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-violet-glow/60 w-44 transition-all"
+            />
