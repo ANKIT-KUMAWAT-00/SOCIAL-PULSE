@@ -88,3 +88,86 @@ function ScatterScene({
                 </div>
               </Html>
             )}
+          </group>
+        );
+      })}
+
+      <OrbitControls
+        enableDamping
+        dampingFactor={0.05}
+        rotateSpeed={0.8}
+        zoomSpeed={1.0}
+        maxDistance={120}
+        minDistance={5}
+      />
+    </>
+  );
+}
+
+export function EmbeddingScatter3D({ points, clusters }: EmbeddingScatter3DProps) {
+  const [selectedClusterId, setSelectedClusterId] = useState<number | null>(null);
+  const [hoveredPoint, setHoveredPoint] = useState<TopicScatterPoint | null>(null);
+
+  return (
+    <div className="relative w-full h-[520px] rounded-2xl overflow-hidden bg-midnight-950 border border-surface-border shadow-glow-card">
+      {/* Top Filter Bar */}
+      <div className="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
+        <div className="flex flex-wrap items-center gap-2 pointer-events-auto bg-midnight-900/80 p-1.5 rounded-xl backdrop-blur-md border border-surface-border">
+          <button
+            onClick={() => setSelectedClusterId(null)}
+            className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+              selectedClusterId === null
+                ? "bg-violet-glow text-white shadow-glow-violet"
+                : "text-gray-400 hover:text-white"
+            }`}
+          >
+            All Clusters ({points.length} points)
+          </button>
+          {clusters.map((c) => (
+            <button
+              key={c.cluster_label_id}
+              onClick={() =>
+                setSelectedClusterId(
+                  selectedClusterId === c.cluster_label_id ? null : c.cluster_label_id
+                )
+              }
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all ${
+                selectedClusterId === c.cluster_label_id
+                  ? "bg-white/15 text-white border border-white/30"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: c.color }}
+              />
+              {c.name.split(":")[0]} ({c.post_count})
+            </button>
+          ))}
+        </div>
+
+        <div className="text-xs font-mono text-gray-400 bg-midnight-900/80 backdrop-blur px-3 py-1.5 rounded-xl border border-surface-border pointer-events-auto">
+          3D UMAP Manifold Projection
+        </div>
+      </div>
+
+      {/* Canvas */}
+      <Canvas
+        camera={{ position: [0, 0, 45], fov: 45 }}
+        gl={{ antialias: true, alpha: true }}
+      >
+        <ScatterScene
+          points={points}
+          selectedClusterId={selectedClusterId}
+          hoveredPoint={hoveredPoint}
+          setHoveredPoint={setHoveredPoint}
+        />
+      </Canvas>
+
+      {/* Controls Hint */}
+      <div className="absolute bottom-4 right-4 z-10 text-[11px] font-mono text-gray-500 bg-midnight-900/60 backdrop-blur px-3 py-1.5 rounded-lg border border-white/5 pointer-events-none">
+        Hover point for post preview | Orbit: Drag | Zoom: Scroll
+      </div>
+    </div>
+  );
+}
