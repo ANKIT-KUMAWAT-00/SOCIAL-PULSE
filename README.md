@@ -178,3 +178,19 @@ page-pulse/
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
+│   │   ├── app/                # Next.js App Router (Landing + Dashboard pages)
+│   │   ├── components/3d/      # HeroSphere, NetworkGraph3D, EmbeddingScatter3D
+│   │   ├── lib/                # Typed API client & utilities
+│   │   └── types/              # TypeScript schema interfaces
+│   ├── tailwind.config.ts      # Midnight & neon glass theme
+│   ├── next.config.js          # API proxy & transpilation
+│   └── Dockerfile
+├── docker-compose.yml
+├── .env.example
+└── README.md
+```
+
+---
+
+## ⚖️ Academic Integrity & Disclaimer
+This application distinguishes between real uploaded data and synthetic benchmarks. Synthetic benchmarks are explicitly tagged `is_synthetic = True` and are provided for educational and evaluation purposes. All metrics, cluster assignments, and graph modularity values are computed dynamically by actual machine learning algorithms.
