@@ -108,3 +108,73 @@ pip install sentence-transformers umap-learn hdbscan pydantic-settings httpx
 
 # Start FastAPI server
 PYTHONPATH=. uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+The backend initializes the database and automatically seeds an initial benchmark dataset on first boot at `http://127.0.0.1:8000`.
+- API Documentation: `http://127.0.0.1:8000/docs`
+
+### 2. Frontend Setup
+```bash
+cd frontend
+
+# Install dependencies
+npm install --legacy-peer-deps
+
+# Build & run production server
+npm run build
+npm start
+
+# Or run in development mode
+npm run dev
+```
+The frontend is available at `http://localhost:3000`.
+
+---
+
+## 🐳 Docker Deployment
+
+Run both backend and frontend in isolated production containers using Docker Compose:
+
+```bash
+docker-compose up --build
+```
+- Frontend: `http://localhost:3000`
+- Backend API: `http://localhost:8000`
+
+---
+
+## 🧪 Testing & Verification
+
+Run the automated backend test suite:
+```bash
+PYTHONPATH=backend backend/venv/bin/pytest backend/tests/test_api.py -v
+```
+All tests verify:
+- Health check & API availability
+- Academic Team verification
+- Synthetic data generation & database ingestion
+- Full Topic Discovery (UMAP + HDBSCAN + c-TF-IDF)
+- Full Community Detection (Louvain + Centralities)
+- 3D coordinates & graph payloads
+- Live ML experiment execution and evaluation metrics
+
+---
+
+## 📂 Project Structure
+
+```
+page-pulse/
+├── backend/
+│   ├── app/
+│   │   ├── main.py             # FastAPI entrypoint, router mounting, seed hook
+│   │   ├── config.py           # Application settings, paths, CORS
+│   │   ├── database.py         # SQLAlchemy engine & session factory
+│   │   ├── models/             # Dataset, SocialPost, SocialUser, Topic, Community, MLExperiment
+│   │   ├── schemas/            # Pydantic request/response schemas
+│   │   ├── ml/                 # TopicEngine, CommunityEngine, CrossAnalyzer, Preprocessor, Metrics
+│   │   ├── api/                # API route handlers (datasets, topics, communities, analytics, experiments)
+│   │   └── utils/              # Synthetic social network & multi-topic dataset generator
+│   ├── tests/                  # Test suite
+│   ├── Dockerfile
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
