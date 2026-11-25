@@ -1,15 +1,16 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Html } from "@react-three/drei";
-import * as THREE from "three";
 import { TopicScatterPoint, TopicCluster } from "@/types";
-import { Filter, Layers, MessageSquare, ThumbsUp } from "lucide-react";
+import { ThumbsUp, Eye, EyeOff } from "lucide-react";
 
 interface EmbeddingScatter3DProps {
   points: TopicScatterPoint[];
   clusters: TopicCluster[];
+  selectedClusterId?: number | null;
+  onSelectClusterId?: (id: number | null) => void;
 }
 
 function ScatterScene({
@@ -25,19 +26,19 @@ function ScatterScene({
 }) {
   return (
     <>
-      <ambientLight intensity={0.7} />
-      <pointLight position={[50, 50, 50]} intensity={1.5} color="#8b5cf6" />
-      <pointLight position={[-50, -50, -50]} intensity={1.2} color="#06b6d4" />
+      <ambientLight intensity={0.55} />
+      <pointLight position={[-50, 50, 50]} intensity={1.7} color="#56B4F9" />
+      <pointLight position={[50, -50, -50]} intensity={1.5} color="#FF2E93" />
 
       {points.map((pt) => {
         const isHovered = hoveredPoint?.id === pt.id;
         const matchesCluster =
           selectedClusterId === null || pt.topic_cluster_id === selectedClusterId;
-        const opacity = matchesCluster ? (isHovered ? 1.0 : 0.8) : 0.08;
-        const scale = isHovered ? 0.8 : pt.is_outlier ? 0.35 : 0.45;
+        const opacity = matchesCluster ? (isHovered ? 1.0 : 0.85) : 0.08;
+        const scale = isHovered ? 0.85 : pt.is_outlier ? 0.34 : 0.45;
 
-        // Scale coordinates to fit nicely in 3D viewport
         const pos: [number, number, number] = [pt.x * 2.5, pt.y * 2.5, (pt.z || 0) * 2.5];
+        const pointColor = pt.is_outlier ? "#475569" : pt.color;
 
         return (
           <group key={pt.id} position={pos}>
@@ -51,37 +52,37 @@ function ScatterScene({
             >
               <sphereGeometry args={[1, 12, 12]} />
               <meshStandardMaterial
-                color={pt.is_outlier ? "#64748b" : pt.color}
-                emissive={pt.is_outlier ? "#64748b" : pt.color}
-                emissiveIntensity={isHovered ? 0.9 : 0.25}
+                color={pointColor}
+                emissive={pointColor}
+                emissiveIntensity={isHovered ? 0.95 : 0.3}
                 transparent
                 opacity={opacity}
-                roughness={0.3}
+                roughness={0.25}
               />
             </mesh>
 
             {isHovered && (
-              <Html distanceFactor={35} position={[0, scale + 0.8, 0]} center>
-                <div className="pointer-events-none w-64 p-3 rounded-xl bg-midnight-900/95 backdrop-blur-md border border-white/20 shadow-2xl text-xs text-white">
-                  <div className="flex items-center justify-between pb-1 mb-1.5 border-b border-white/10">
+              <Html distanceFactor={36} position={[0, scale + 0.9, 0]} center>
+                <div className="pointer-events-none w-72 p-3.5 bg-black/95 border border-white/25 backdrop-blur-sm text-xs text-white shadow-2xl">
+                  <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-white/15">
                     <span
-                      className="font-medium text-[11px] truncate"
-                      style={{ color: pt.color }}
+                      className="font-mono text-[10px] tracking-wider uppercase truncate"
+                      style={{ color: pointColor }}
                     >
                       {pt.topic_name}
                     </span>
                     {pt.is_outlier && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono">
+                      <span className="text-[9px] px-1.5 py-0.5 border border-[#FF2E93]/40 text-[#FF2E93] font-mono uppercase">
                         OUTLIER
                       </span>
                     )}
                   </div>
-                  <p className="text-gray-300 text-[11px] line-clamp-3 leading-relaxed">
+                  <p className="text-zinc-300 text-[11px] line-clamp-3 leading-relaxed">
                     "{pt.text}"
                   </p>
-                  <div className="flex items-center justify-between mt-2 pt-1 border-t border-white/5 text-[10px] text-gray-400 font-mono">
+                  <div className="flex items-center justify-between mt-2.5 pt-1.5 border-t border-white/10 text-[10px] text-zinc-500 font-mono">
                     <span>@{pt.user_id}</span>
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1 text-[#56B4F9]">
                       <ThumbsUp className="w-2.5 h-2.5" /> {pt.likes}
                     </span>
                   </div>
@@ -104,69 +105,150 @@ function ScatterScene({
   );
 }
 
-export function EmbeddingScatter3D({ points, clusters }: EmbeddingScatter3DProps) {
-  const [selectedClusterId, setSelectedClusterId] = useState<number | null>(null);
+export function EmbeddingScatter3D({
+  points,
+  clusters,
+  selectedClusterId: controlledClusterId,
+  onSelectClusterId,
+}: EmbeddingScatter3DProps) {
+  const [internalClusterId, setInternalClusterId] = useState<number | null>(null);
   const [hoveredPoint, setHoveredPoint] = useState<TopicScatterPoint | null>(null);
+  const [viewMode, setViewMode] = useState<"3d" | "2d">("3d");
+
+  const activeClusterId =
+    controlledClusterId !== undefined ? controlledClusterId : internalClusterId;
+
+  const setClusterFilter = (id: number | null) => {
+    setInternalClusterId(id);
+    if (onSelectClusterId) onSelectClusterId(id);
+  };
+
+  // Compute 2D SVG normalization bounds
+  const { minX, spanX, minY, spanY } = React.useMemo(() => {
+    if (!points.length) return { minX: -10, spanX: 20, minY: -10, spanY: 20 };
+    const xs = points.map((p) => p.x);
+    const ys = points.map((p) => p.y);
+    const mnX = Math.min(...xs);
+    const mxX = Math.max(...xs);
+    const mnY = Math.min(...ys);
+    const mxY = Math.max(...ys);
+    return {
+      minX: mnX,
+      spanX: Math.max(0.1, mxX - mnX),
+      minY: mnY,
+      spanY: Math.max(0.1, mxY - mnY),
+    };
+  }, [points]);
 
   return (
-    <div className="relative w-full h-[520px] rounded-2xl overflow-hidden bg-midnight-950 border border-surface-border shadow-glow-card">
+    <div className="relative w-full h-[540px] bg-black border border-white/15 overflow-hidden">
+      {/* Subtle Dual-Rim Backlight */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(circle at 25% 25%, rgba(86, 180, 249, 0.08) 0%, transparent 45%), radial-gradient(circle at 80% 75%, rgba(255, 46, 147, 0.08) 0%, transparent 45%)",
+        }}
+      />
+
       {/* Top Filter Bar */}
       <div className="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
-        <div className="flex flex-wrap items-center gap-2 pointer-events-auto bg-midnight-900/80 p-1.5 rounded-xl backdrop-blur-md border border-surface-border">
+        <div className="flex flex-wrap items-center gap-1.5 pointer-events-auto bg-black/85 p-1.5 border border-white/15 backdrop-blur-sm max-w-4xl">
           <button
-            onClick={() => setSelectedClusterId(null)}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-              selectedClusterId === null
-                ? "bg-violet-glow text-white shadow-glow-violet"
-                : "text-gray-400 hover:text-white"
+            onClick={() => setClusterFilter(null)}
+            className={`px-3 py-1 font-mono text-[10px] tracking-[0.15em] uppercase transition-colors ${
+              activeClusterId === null
+                ? "bg-[#56B4F9] text-black font-bold"
+                : "text-zinc-400 hover:text-white"
             }`}
           >
-            All Clusters ({points.length} points)
+            ALL ({points.length})
           </button>
-          {clusters.map((c) => (
+          {clusters.slice(0, 8).map((c) => (
             <button
               key={c.cluster_label_id}
               onClick={() =>
-                setSelectedClusterId(
-                  selectedClusterId === c.cluster_label_id ? null : c.cluster_label_id
+                setClusterFilter(
+                  activeClusterId === c.cluster_label_id ? null : c.cluster_label_id
                 )
               }
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all ${
-                selectedClusterId === c.cluster_label_id
-                  ? "bg-white/15 text-white border border-white/30"
-                  : "text-gray-400 hover:text-white"
+              className={`px-2.5 py-1 font-mono text-[10px] tracking-[0.1em] uppercase flex items-center gap-1.5 border transition-colors ${
+                activeClusterId === c.cluster_label_id
+                  ? "bg-white/15 text-white border-[#FF2E93]"
+                  : "border-transparent text-zinc-400 hover:text-white"
               }`}
             >
-              <span
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: c.color }}
-              />
-              {c.name.split(":")[0]} ({c.post_count})
+              <span className="w-2 h-2" style={{ backgroundColor: c.color }} />
+              {c.cluster_label_id === -1 ? "NOISE" : `T#${c.cluster_label_id + 1}`} ({c.post_count})
             </button>
           ))}
         </div>
 
-        <div className="text-xs font-mono text-gray-400 bg-midnight-900/80 backdrop-blur px-3 py-1.5 rounded-xl border border-surface-border pointer-events-auto">
-          3D UMAP Manifold Projection
+        <div className="flex items-center gap-2 pointer-events-auto">
+          <button
+            onClick={() => setViewMode(viewMode === "3d" ? "2d" : "3d")}
+            className="px-3 py-1.5 bg-black/85 border border-white/15 hover:border-[#56B4F9] font-mono text-[10px] tracking-[0.2em] text-zinc-300 hover:text-white transition-colors flex items-center gap-1.5"
+          >
+            {viewMode === "3d" ? (
+              <Eye className="w-3.5 h-3.5 text-[#56B4F9]" />
+            ) : (
+              <EyeOff className="w-3.5 h-3.5 text-[#FF2E93]" />
+            )}
+            {viewMode.toUpperCase()} MANIFOLD
+          </button>
         </div>
       </div>
 
-      {/* Canvas */}
-      <Canvas
-        camera={{ position: [0, 0, 45], fov: 45 }}
-        gl={{ antialias: true, alpha: true }}
-      >
-        <ScatterScene
-          points={points}
-          selectedClusterId={selectedClusterId}
-          hoveredPoint={hoveredPoint}
-          setHoveredPoint={setHoveredPoint}
-        />
-      </Canvas>
+      {viewMode === "3d" ? (
+        <Canvas
+          camera={{ position: [0, 0, 45], fov: 45 }}
+          gl={{ antialias: true, alpha: true }}
+        >
+          <ScatterScene
+            points={points}
+            selectedClusterId={activeClusterId}
+            hoveredPoint={hoveredPoint}
+            setHoveredPoint={setHoveredPoint}
+          />
+        </Canvas>
+      ) : (
+        /* 2D UMAP Manifold Scatter Projection */
+        <div className="w-full h-full flex items-center justify-center p-12 relative">
+          <svg className="w-full h-full" viewBox="-10 -10 120 120" preserveAspectRatio="xMidYMid meet">
+            {points.map((pt) => {
+              const cx = ((pt.x - minX) / spanX) * 100;
+              const cy = ((pt.y - minY) / spanY) * 100;
+              const match =
+                activeClusterId === null || pt.topic_cluster_id === activeClusterId;
+              return (
+                <circle
+                  key={pt.id}
+                  cx={cx}
+                  cy={cy}
+                  r={pt.is_outlier ? 0.9 : 1.3}
+                  fill={pt.is_outlier ? "#475569" : pt.color}
+                  fillOpacity={match ? 0.88 : 0.12}
+                  className="cursor-pointer transition-opacity"
+                  onMouseEnter={() => setHoveredPoint(pt)}
+                  onMouseLeave={() => setHoveredPoint(null)}
+                />
+              );
+            })}
+          </svg>
+          {hoveredPoint && (
+            <div className="absolute bottom-4 left-4 w-80 p-3.5 bg-black/95 border border-white/25 text-xs">
+              <div className="font-mono text-[10px] uppercase tracking-wider mb-1" style={{ color: hoveredPoint.color }}>
+                {hoveredPoint.topic_name}
+              </div>
+              <p className="text-zinc-300 text-[11px] line-clamp-2">"{hoveredPoint.text}"</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Controls Hint */}
-      <div className="absolute bottom-4 right-4 z-10 text-[11px] font-mono text-gray-500 bg-midnight-900/60 backdrop-blur px-3 py-1.5 rounded-lg border border-white/5 pointer-events-none">
-        Hover point for post preview | Orbit: Drag | Zoom: Scroll
+      <div className="absolute bottom-4 right-4 z-10 text-[9px] font-mono tracking-[0.22em] uppercase text-zinc-500 bg-black/80 px-3 py-1.5 border border-white/10 pointer-events-none">
+        HOVER POINT FOR POST // DRAG TO ORBIT // 2D & 3D UMAP
       </div>
     </div>
   );
