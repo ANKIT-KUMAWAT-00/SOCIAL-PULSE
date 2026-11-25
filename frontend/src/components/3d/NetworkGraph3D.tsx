@@ -1,17 +1,19 @@
 "use client";
 
-import React, { useState, useRef, useMemo, useCallback } from "react";
-import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber";
-import { OrbitControls, Text, Html } from "@react-three/drei";
+import React, { useState, useRef, useMemo } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { OrbitControls, Html } from "@react-three/drei";
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
 import { NetworkNode, NetworkEdge, Community } from "@/types";
-import { Search, Filter, ZoomIn, RefreshCw, Eye, EyeOff } from "lucide-react";
+import { Search, Eye, EyeOff, RotateCcw } from "lucide-react";
 
 interface NetworkGraph3DProps {
   nodes: NetworkNode[];
   edges: NetworkEdge[];
   communities: Community[];
   onSelectNode?: (node: NetworkNode | null) => void;
+  initialCommunityFilter?: number | null;
 }
 
 function GraphScene({
@@ -33,14 +35,16 @@ function GraphScene({
   selectedNode: NetworkNode | null;
   setSelectedNode: (node: NetworkNode | null) => void;
 }) {
+  const controlsRef = useRef<OrbitControlsImpl>(null!);
+  const pulsesRef = useRef<THREE.Points>(null!);
   const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
-  // Edges geometry
-  const { linePositions, lineColors } = useMemo(() => {
+  const { linePositions, lineColors, activeEdges, pulsePositions, pulseColors } = useMemo(() => {
     const coords: number[] = [];
     const cols: number[] = [];
+    const visibleEdges: { src: NetworkNode; tgt: NetworkNode; color: THREE.Color; speed: number; offset: number }[] = [];
 
-    edges.forEach((e) => {
+    edges.forEach((e, idx) => {
       const src = nodeMap.get(e.source);
       const tgt = nodeMap.get(e.target);
       if (!src || !tgt) return;
@@ -53,24 +57,79 @@ function GraphScene({
       coords.push(tgt.x, tgt.y, tgt.z);
 
       const baseCol = new THREE.Color(src.color);
-      const alpha = isVisible ? 0.35 : 0.04;
+      const alpha = isVisible ? 0.38 : 0.04;
       cols.push(baseCol.r * alpha, baseCol.g * alpha, baseCol.b * alpha);
       cols.push(baseCol.r * alpha, baseCol.g * alpha, baseCol.b * alpha);
+
+      if (isVisible && visibleEdges.length < 90 && idx % 2 === 0) {
+        visibleEdges.push({
+          src,
+          tgt,
+          color: baseCol,
+          speed: 0.3 + (idx % 7) * 0.06,
+          offset: (idx % 13) / 13,
+        });
+      }
+    });
+
+    const pPos = new Float32Array(visibleEdges.length * 3);
+    const pCol = new Float32Array(visibleEdges.length * 3);
+    visibleEdges.forEach((ve, i) => {
+      pPos[i * 3] = ve.src.x;
+      pPos[i * 3 + 1] = ve.src.y;
+      pPos[i * 3 + 2] = ve.src.z;
+      pCol[i * 3] = ve.color.r;
+      pCol[i * 3 + 1] = ve.color.g;
+      pCol[i * 3 + 2] = ve.color.b;
     });
 
     return {
       linePositions: new Float32Array(coords),
       lineColors: new Float32Array(cols),
+      activeEdges: visibleEdges,
+      pulsePositions: pPos,
+      pulseColors: pCol,
     };
   }, [edges, nodeMap, selectedCommunity]);
 
+  const targetVec = useMemo(() => new THREE.Vector3(), []);
+
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime();
+
+    // Smoothly focus camera target on selected node (or reset to origin)
+    if (controlsRef.current) {
+      if (selectedNode) {
+        targetVec.set(selectedNode.x, selectedNode.y, selectedNode.z);
+      } else {
+        targetVec.set(0, 0, 0);
+      }
+      controlsRef.current.target.lerp(targetVec, 0.08);
+      controlsRef.current.update();
+    }
+
+    // Animate particles flowing along active edges
+    if (pulsesRef.current && activeEdges.length > 0) {
+      const attr = pulsesRef.current.geometry.attributes.position as THREE.BufferAttribute;
+      const arr = attr.array as Float32Array;
+      for (let i = 0; i < activeEdges.length; i++) {
+        const edge = activeEdges[i];
+        const p = (t * edge.speed + edge.offset) % 1;
+        arr[i * 3] = THREE.MathUtils.lerp(edge.src.x, edge.tgt.x, p);
+        arr[i * 3 + 1] = THREE.MathUtils.lerp(edge.src.y, edge.tgt.y, p);
+        arr[i * 3 + 2] = THREE.MathUtils.lerp(edge.src.z, edge.tgt.z, p);
+      }
+      attr.needsUpdate = true;
+    }
+  });
+
   return (
     <>
-      <ambientLight intensity={0.6} />
-      <pointLight position={[60, 60, 60]} intensity={1.5} color="#8b5cf6" />
-      <pointLight position={[-60, -60, -60]} intensity={1.2} color="#06b6d4" />
+      <ambientLight intensity={0.45} />
+      <pointLight position={[-65, 65, 65]} intensity={1.8} color="#56B4F9" />
+      <pointLight position={[65, -65, -65]} intensity={1.6} color="#FF2E93" />
 
-      {/* Edges */}
+      {/* Graph Edges */}
       <lineSegments>
         <bufferGeometry>
           <bufferAttribute
@@ -89,7 +148,34 @@ function GraphScene({
         <lineBasicMaterial vertexColors transparent blending={THREE.AdditiveBlending} />
       </lineSegments>
 
-      {/* Nodes */}
+      {/* Traveling Data Signals */}
+      {activeEdges.length > 0 && (
+        <points ref={pulsesRef}>
+          <bufferGeometry>
+            <bufferAttribute
+              attach="attributes-position"
+              count={pulsePositions.length / 3}
+              array={pulsePositions}
+              itemSize={3}
+            />
+            <bufferAttribute
+              attach="attributes-color"
+              count={pulseColors.length / 3}
+              array={pulseColors}
+              itemSize={3}
+            />
+          </bufferGeometry>
+          <pointsMaterial
+            size={1.6}
+            vertexColors
+            transparent
+            opacity={0.9}
+            blending={THREE.AdditiveBlending}
+          />
+        </points>
+      )}
+
+      {/* User Nodes */}
       {nodes.map((node) => {
         const isHovered = hoveredNodeId === node.id;
         const isSelected = selectedNode?.id === node.id;
@@ -100,11 +186,12 @@ function GraphScene({
           node.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
           node.id.toLowerCase().includes(searchQuery.toLowerCase());
 
-        const opacity = matchesCommunity && matchesSearch ? 1.0 : 0.12;
+        const isHighlighted = matchesCommunity && matchesSearch;
+        const opacity = isHighlighted ? 1.0 : 0.1;
 
-        // Scale size by PageRank
         const baseRadius = 1.4 + Math.min(3.5, (node.pagerank || 0.01) * 75);
-        const scale = isHovered || isSelected ? baseRadius * 1.5 : baseRadius;
+        const scale = isHovered || isSelected ? baseRadius * 1.45 : baseRadius;
+        const activeColor = isSelected ? "#FF2E93" : node.color;
 
         return (
           <group key={node.id} position={[node.x, node.y, node.z]}>
@@ -122,26 +209,25 @@ function GraphScene({
             >
               <sphereGeometry args={[1, 16, 16]} />
               <meshStandardMaterial
-                color={isSelected ? "#f59e0b" : node.color}
-                emissive={isSelected ? "#f59e0b" : node.color}
-                emissiveIntensity={isHovered || isSelected ? 0.8 : 0.25}
+                color={activeColor}
+                emissive={activeColor}
+                emissiveIntensity={isHovered || isSelected ? 0.9 : 0.3}
                 transparent
                 opacity={opacity}
                 roughness={0.2}
-                metalness={0.8}
+                metalness={0.75}
               />
             </mesh>
 
-            {/* Label for influential nodes or on hover */}
-            {(isHovered || isSelected || node.pagerank > 0.04) && matchesCommunity && (
-              <Html distanceFactor={60} position={[0, scale + 1.5, 0]} center>
+            {(isHovered || isSelected || (node.pagerank > 0.04 && isHighlighted)) && (
+              <Html distanceFactor={62} position={[0, scale + 1.6, 0]} center>
                 <div
-                  className={`pointer-events-none px-2.5 py-1 rounded-md text-xs font-mono font-medium backdrop-blur-md transition-all shadow-lg whitespace-nowrap ${
+                  className={`pointer-events-none px-2 py-0.5 text-[10px] font-mono tracking-wider whitespace-nowrap border ${
                     isSelected
-                      ? "bg-amber-500/90 text-black border border-amber-300"
+                      ? "bg-[#FF2E93] text-white border-white"
                       : isHovered
-                      ? "bg-midnight-800/90 text-cyan-300 border border-cyan-500/50"
-                      : "bg-midnight-900/75 text-gray-300 border border-white/10"
+                      ? "bg-black/95 text-[#56B4F9] border-[#56B4F9]/60"
+                      : "bg-black/80 text-zinc-300 border-white/15"
                   }`}
                 >
                   @{node.username}
@@ -153,12 +239,13 @@ function GraphScene({
       })}
 
       <OrbitControls
+        ref={controlsRef}
         enableDamping
         dampingFactor={0.05}
         rotateSpeed={0.8}
         zoomSpeed={1.0}
-        maxDistance={250}
-        minDistance={10}
+        maxDistance={260}
+        minDistance={12}
       />
     </>
   );
@@ -169,8 +256,9 @@ export function NetworkGraph3D({
   edges,
   communities,
   onSelectNode,
+  initialCommunityFilter = null,
 }: NetworkGraph3DProps) {
-  const [selectedCommunity, setSelectedCommunity] = useState<number | null>(null);
+  const [selectedCommunity, setSelectedCommunity] = useState<number | null>(initialCommunityFilter);
   const [searchQuery, setSearchQuery] = useState("");
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<NetworkNode | null>(null);
@@ -189,20 +277,29 @@ export function NetworkGraph3D({
   };
 
   return (
-    <div className="relative w-full h-[620px] rounded-2xl overflow-hidden bg-midnight-950 border border-surface-border shadow-glow-card">
+    <div className="relative w-full h-[640px] bg-black border border-white/15 overflow-hidden">
+      {/* Dual-Rim Atmospheric Glow */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(circle at 20% 20%, rgba(86, 180, 249, 0.08) 0%, transparent 45%), radial-gradient(circle at 85% 80%, rgba(255, 46, 147, 0.08) 0%, transparent 45%)",
+        }}
+      />
+
       {/* Top Interactive HUD Bar */}
       <div className="absolute top-4 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
-        {/* Left: Community Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2 pointer-events-auto bg-midnight-900/80 p-1.5 rounded-xl backdrop-blur-md border border-surface-border">
+        {/* Left: Community Filter Chips */}
+        <div className="flex flex-wrap items-center gap-1.5 pointer-events-auto bg-black/85 p-1.5 border border-white/15 backdrop-blur-sm">
           <button
             onClick={() => setSelectedCommunity(null)}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+            className={`px-3 py-1 font-mono text-[10px] tracking-[0.16em] uppercase transition-colors ${
               selectedCommunity === null
-                ? "bg-violet-glow text-white shadow-glow-violet"
-                : "text-gray-400 hover:text-white"
+                ? "bg-[#56B4F9] text-black font-bold"
+                : "text-zinc-400 hover:text-white"
             }`}
           >
-            All Communities ({communities.length})
+            ALL ({communities.length})
           </button>
           {communities.map((c) => (
             <button
@@ -212,40 +309,52 @@ export function NetworkGraph3D({
                   selectedCommunity === c.community_label_id ? null : c.community_label_id
                 )
               }
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all ${
+              className={`px-2.5 py-1 font-mono text-[10px] tracking-[0.12em] uppercase flex items-center gap-1.5 transition-colors border ${
                 selectedCommunity === c.community_label_id
-                  ? "bg-white/15 text-white border border-white/30"
-                  : "text-gray-400 hover:text-white"
+                  ? "bg-white/15 text-white border-[#FF2E93]"
+                  : "border-transparent text-zinc-400 hover:text-white"
               }`}
             >
-              <span
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: c.color }}
-              />
+              <span className="w-2 h-2" style={{ backgroundColor: c.color }} />
               {c.name.split(" ")[0]} ({c.member_count})
             </button>
           ))}
         </div>
 
-        {/* Right: Search & View Toggle */}
+        {/* Right: Search, Reset Focus & View Toggle */}
         <div className="flex items-center gap-2 pointer-events-auto">
           <div className="relative">
-            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search user node..."
+              placeholder="SEARCH USER NODE..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-midnight-900/80 backdrop-blur-md border border-surface-border rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-violet-glow/60 w-44 transition-all"
+              className="bg-black/85 border border-white/15 pl-8 pr-3 py-1.5 font-mono text-[10px] tracking-wider text-white placeholder-zinc-600 focus:outline-none focus:border-[#56B4F9] w-48 transition-colors"
             />
           </div>
 
+          {selectedNode && (
+            <button
+              onClick={() => handleSelect(null)}
+              className="px-2.5 py-1.5 bg-black/85 border border-[#FF2E93]/60 font-mono text-[10px] tracking-wider text-[#FF2E93] hover:bg-[#FF2E93] hover:text-white transition-colors flex items-center gap-1"
+              title="Reset Camera Focus"
+            >
+              <RotateCcw className="w-3 h-3" />
+              RESET
+            </button>
+          )}
+
           <button
             onClick={() => setViewMode(viewMode === "3d" ? "2d" : "3d")}
-            className="px-3 py-1.5 bg-midnight-900/80 backdrop-blur-md border border-surface-border rounded-xl text-xs text-gray-300 hover:text-white transition-all flex items-center gap-1.5"
+            className="px-3 py-1.5 bg-black/85 border border-white/15 hover:border-[#56B4F9] font-mono text-[10px] tracking-[0.2em] text-zinc-300 hover:text-white transition-colors flex items-center gap-1.5"
             title="Toggle 2D / 3D Canvas Projection"
           >
-            {viewMode === "3d" ? <Eye className="w-3.5 h-3.5 text-cyan-glow" /> : <EyeOff className="w-3.5 h-3.5 text-violet-glow" />}
+            {viewMode === "3d" ? (
+              <Eye className="w-3.5 h-3.5 text-[#56B4F9]" />
+            ) : (
+              <EyeOff className="w-3.5 h-3.5 text-[#FF2E93]" />
+            )}
             {viewMode.toUpperCase()}
           </button>
         </div>
@@ -269,13 +378,17 @@ export function NetworkGraph3D({
           />
         </Canvas>
       ) : (
-        /* 2D Canvas Fallback View */
+        /* 2D SVG Fallback Projection */
         <div className="w-full h-full flex items-center justify-center p-8 overflow-auto">
-          <svg className="w-full h-full max-w-4xl" viewBox="-60 -60 120 120">
+          <svg className="w-full h-full max-w-4xl" viewBox="-65 -65 130 130">
             {edges.map((e, idx) => {
               const src = nodes.find((n) => n.id === e.source);
               const tgt = nodes.find((n) => n.id === e.target);
               if (!src || !tgt) return null;
+              const match =
+                selectedCommunity === null ||
+                (src.community_id === selectedCommunity &&
+                  tgt.community_id === selectedCommunity);
               return (
                 <line
                   key={idx}
@@ -284,75 +397,87 @@ export function NetworkGraph3D({
                   x2={tgt.x * 0.7}
                   y2={tgt.y * 0.7}
                   stroke={src.color}
-                  strokeOpacity={0.25}
-                  strokeWidth={0.5}
+                  strokeOpacity={match ? 0.35 : 0.05}
+                  strokeWidth={0.4}
                 />
               );
             })}
-            {nodes.map((n) => (
-              <circle
-                key={n.id}
-                cx={n.x * 0.7}
-                cy={n.y * 0.7}
-                r={1.5 + n.pagerank * 30}
-                fill={n.color}
-                className="cursor-pointer hover:stroke-white hover:stroke-2"
-                onClick={() => handleSelect(n)}
-              />
-            ))}
+            {nodes.map((n) => {
+              const match =
+                selectedCommunity === null || n.community_id === selectedCommunity;
+              return (
+                <circle
+                  key={n.id}
+                  cx={n.x * 0.7}
+                  cy={n.y * 0.7}
+                  r={1.5 + n.pagerank * 30}
+                  fill={n.color}
+                  fillOpacity={match ? 0.95 : 0.15}
+                  className="cursor-pointer hover:stroke-white hover:stroke-1"
+                  onClick={() => handleSelect(n)}
+                />
+              );
+            })}
           </svg>
         </div>
       )}
 
       {/* Floating HUD: Active Node Telemetry Panel */}
       {activeNode && (
-        <div className="absolute bottom-4 left-4 z-10 w-72 p-4 rounded-xl bg-midnight-900/90 backdrop-blur-md border border-white/10 shadow-2xl transition-all">
-          <div className="flex items-center justify-between pb-2 border-b border-white/10">
+        <div className="absolute bottom-4 left-4 z-10 w-72 p-4 bg-black/95 border border-white/20 backdrop-blur-sm">
+          <div className="flex items-center justify-between pb-2.5 border-b border-white/15">
             <div className="flex items-center gap-2">
-              <span
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: activeNode.color }}
-              />
-              <span className="font-mono font-semibold text-white text-sm">
+              <span className="w-2.5 h-2.5" style={{ backgroundColor: activeNode.color }} />
+              <span className="font-mono font-semibold text-white text-xs tracking-wider">
                 @{activeNode.username}
               </span>
             </div>
-            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-white/10 text-gray-300">
+            <span className="text-[9px] uppercase font-mono tracking-[0.2em] px-2 py-0.5 border border-white/15 text-zinc-300">
               {activeNode.community_name}
             </span>
           </div>
 
           <div className="grid grid-cols-3 gap-2 my-3 text-center">
-            <div className="bg-white/5 rounded-lg p-1.5">
-              <div className="text-[10px] text-gray-400">PageRank</div>
-              <div className="text-xs font-mono font-semibold text-cyan-glow">
+            <div className="bg-[#08090c] border border-white/10 p-2">
+              <div className="text-[9px] font-mono tracking-wider text-zinc-500 uppercase">
+                PageRank
+              </div>
+              <div className="text-xs font-mono font-semibold text-[#56B4F9] mt-0.5 tabular-nums">
                 {activeNode.pagerank.toFixed(4)}
               </div>
             </div>
-            <div className="bg-white/5 rounded-lg p-1.5">
-              <div className="text-[10px] text-gray-400">Degree</div>
-              <div className="text-xs font-mono font-semibold text-violet-glow">
+            <div className="bg-[#08090c] border border-white/10 p-2">
+              <div className="text-[9px] font-mono tracking-wider text-zinc-500 uppercase">
+                Degree
+              </div>
+              <div className="text-xs font-mono font-semibold text-[#FF2E93] mt-0.5 tabular-nums">
                 {activeNode.degree.toFixed(3)}
               </div>
             </div>
-            <div className="bg-white/5 rounded-lg p-1.5">
-              <div className="text-[10px] text-gray-400">Betweenness</div>
-              <div className="text-xs font-mono font-semibold text-emerald-400">
+            <div className="bg-[#08090c] border border-white/10 p-2">
+              <div className="text-[9px] font-mono tracking-wider text-zinc-500 uppercase">
+                Between
+              </div>
+              <div className="text-xs font-mono font-semibold text-white mt-0.5 tabular-nums">
                 {activeNode.betweenness.toFixed(3)}
               </div>
             </div>
           </div>
 
-          <div className="text-xs text-gray-400 flex justify-between items-center pt-1">
-            <span>Followers: <strong className="text-white">{activeNode.followers.toLocaleString()}</strong></span>
-            <span>Following: <strong className="text-white">{activeNode.following.toLocaleString()}</strong></span>
+          <div className="text-[10px] font-mono tracking-wider text-zinc-400 flex justify-between items-center pt-1">
+            <span>
+              FOLLOWERS: <strong className="text-white">{activeNode.followers.toLocaleString()}</strong>
+            </span>
+            <span>
+              FOLLOWING: <strong className="text-white">{activeNode.following.toLocaleString()}</strong>
+            </span>
           </div>
         </div>
       )}
 
       {/* Controls Hint Overlay */}
-      <div className="absolute bottom-4 right-4 z-10 text-[11px] font-mono text-gray-500 bg-midnight-900/60 backdrop-blur px-3 py-1.5 rounded-lg border border-white/5 pointer-events-none">
-        Rotate: Left Click + Drag | Pan: Right Click | Zoom: Scroll
+      <div className="absolute bottom-4 right-4 z-10 text-[9px] font-mono tracking-[0.22em] uppercase text-zinc-500 bg-black/80 px-3 py-1.5 border border-white/10 pointer-events-none">
+        CLICK NODE TO FOCUS // DRAG TO ORBIT // SCROLL TO ZOOM
       </div>
     </div>
   );
