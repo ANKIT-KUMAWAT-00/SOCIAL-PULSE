@@ -11,20 +11,20 @@ import umap
 from app.ml.preprocessor import preprocess_corpus
 from app.ml.metrics import compute_clustering_metrics
 
-# Distinct vibrant color palette for clusters
+# Distinct obsidian-contrast editorial palette for clusters
 CLUSTER_COLORS = [
-    "#8b5cf6", # Electric Violet
-    "#06b6d4", # Cyber Cyan
-    "#10b981", # Emerald Pulse
-    "#f59e0b", # Solar Amber
-    "#ec4899", # Neon Pink
-    "#3b82f6", # Blue Wave
-    "#14b8a6", # Teal Aura
-    "#f97316", # Orange Flame
-    "#a855f7", # Purple Glow
-    "#6366f1"  # Indigo Spark
+    "#56B4F9", # Electric Sky Blue
+    "#FF2E93", # Cyber Magenta
+    "#22D3EE", # Ice Cyan
+    "#C084FC", # Luminous Orchid
+    "#34D399", # Mint Pulse
+    "#FBBF24", # Amber Gold
+    "#FB7185", # Coral Rose
+    "#60A5FA", # Cobalt Glow
+    "#E879F9", # Fuchsia Spark
+    "#94A3B8"  # Silver Mist
 ]
-OUTLIER_COLOR = "#64748b" # Slate gray for outliers / noise
+OUTLIER_COLOR = "#475569" # Muted Slate for outliers / noise
 
 class TopicEngine:
     def __init__(self):
