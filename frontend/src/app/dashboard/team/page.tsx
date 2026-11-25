@@ -1,106 +1,111 @@
 "use client";
 
 import React from "react";
-import { Award, Users, BookOpen, Layers, Network, ShieldCheck, Cpu } from "lucide-react";
+import { Award, BookOpen, Layers, Network } from "lucide-react";
 
 export default function TeamPage() {
   const teamMembers = [
     {
+      index: "01",
       name: "Konala Venkata Sri Sai Surya",
       regNo: "12404306",
-      color: "#8b5cf6",
+      accent: "#56B4F9",
     },
     {
+      index: "02",
       name: "Ankit Kumawat",
       regNo: "12406586",
-      color: "#06b6d4",
+      accent: "#FF2E93",
     },
     {
+      index: "03",
       name: "Bhavya Nasa",
       regNo: "12405762",
-      color: "#10b981",
+      accent: "#56B4F9",
     },
   ];
 
   return (
     <div className="space-y-10 max-w-5xl mx-auto">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-          <Award className="w-7 h-7 text-emerald-400" />
-          <span>Project Team & Research Documentation</span>
+      <div className="pb-6 border-b border-white/15">
+        <div className="font-mono text-[10px] tracking-[0.34em] text-[#56B4F9] uppercase mb-2">
+          09 // CREDENTIALS & METHODOLOGY
+        </div>
+        <h1 className="font-display text-2xl sm:text-3xl tracking-[0.06em] uppercase text-white flex items-center gap-3">
+          <Award className="w-6 h-6 text-[#56B4F9]" />
+          <span>PROJECT TEAM & DOCS</span>
         </h1>
-        <p className="text-xs sm:text-sm text-gray-400 mt-1">
-          Academic project details, team credentials, and algorithmic specifications for SocialPulse.
+        <p className="text-xs text-zinc-400 mt-1.5 font-mono">
+          SOCIALPULSE — SOCIAL MEDIA TOPIC & COMMUNITY CLUSTERING
         </p>
       </div>
 
       {/* Team Roster Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {teamMembers.map((member, idx) => (
-          <div
-            key={idx}
-            className="p-6 rounded-2xl bg-midnight-900/80 border border-surface-border backdrop-blur-md text-center space-y-4 hover:border-white/20 transition-all glow-border"
-          >
-            <div
-              className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center font-bold text-2xl text-white shadow-lg"
-              style={{
-                backgroundColor: `${member.color}25`,
-                borderColor: member.color,
-                borderWidth: 1.5,
-              }}
-            >
-              {member.name.charAt(0)}
+      <div className="grid grid-cols-1 md:grid-cols-3 border border-white/15 divide-y md:divide-y-0 md:divide-x divide-white/15 bg-[#050608]">
+        {teamMembers.map((member) => (
+          <div key={member.regNo} className="p-8 space-y-4">
+            <div className="flex items-center justify-between">
+              <span
+                className="font-mono text-[10px] tracking-[0.28em]"
+                style={{ color: member.accent }}
+              >
+                MEMBER {member.index}
+              </span>
+              <span className="w-2 h-2" style={{ backgroundColor: member.accent }} />
             </div>
-
-            <div>
-              <h3 className="text-lg font-bold text-white">{member.name}</h3>
-              <div className="text-xs font-mono text-cyan-glow mt-1 font-semibold">
-                Registration Number: {member.regNo}
-              </div>
+            <h3 className="text-base font-semibold text-white">{member.name}</h3>
+            <div className="font-mono text-xs tracking-[0.18em] text-zinc-400 pt-3 border-t border-white/10">
+              REG NO: <span className="text-white">{member.regNo}</span>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Project Identity & Statement */}
-      <div className="p-6 rounded-2xl bg-midnight-900/60 border border-surface-border backdrop-blur-md space-y-3">
-        <h3 className="text-sm font-mono uppercase tracking-wider text-violet-soft flex items-center gap-2">
-          <BookOpen className="w-4 h-4 text-violet-glow" />
-          <span>Project Identification</span>
-        </h3>
-        <p className="text-gray-300 text-sm leading-relaxed">
-          <strong className="text-white">Project Name:</strong> SocialPulse — Social Media Topic & Community Clustering
+      {/* Project Statement */}
+      <div className="border border-white/15 bg-[#050608] p-6 sm:p-8 space-y-3">
+        <div className="font-mono text-[10px] tracking-[0.28em] uppercase text-[#FF2E93] flex items-center gap-2">
+          <BookOpen className="w-3.5 h-3.5" />
+          <span>PROJECT IDENTIFICATION</span>
+        </div>
+        <p className="text-white text-sm font-medium">
+          SocialPulse — Social Media Topic & Community Clustering
         </p>
-        <p className="text-gray-400 text-xs leading-relaxed">
-          SocialPulse is an end-to-end unsupervised machine learning platform that analyzes unstructured social media posts and user interaction multigraphs to discover latent semantic discussion topics, user social communities, and their cross-sectional relationships without human supervision or labeled training data.
+        <p className="text-zinc-400 text-xs leading-relaxed">
+          SocialPulse is an end-to-end unsupervised machine learning platform that analyzes
+          unstructured social media posts and user interaction multigraphs to discover latent
+          semantic discussion topics, user social communities, and their cross-sectional
+          relationships without labeled training data.
         </p>
       </div>
 
-      {/* Algorithmic Methodology Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="p-6 rounded-2xl bg-midnight-900/60 border border-surface-border backdrop-blur-md space-y-3">
-          <h4 className="text-sm font-bold text-white flex items-center gap-2">
-            <Layers className="w-4 h-4 text-violet-glow" />
-            <span>Topic Discovery Pipeline (Pipeline A)</span>
+      {/* Mathematical Specifications */}
+      <div className="grid grid-cols-1 md:grid-cols-2 border border-white/15 divide-y md:divide-y-0 md:divide-x divide-white/15 bg-[#050608]">
+        <div className="p-6 sm:p-8 space-y-4">
+          <h4 className="font-display text-xs tracking-[0.14em] uppercase text-white flex items-center gap-2">
+            <Layers className="w-4 h-4 text-[#56B4F9]" />
+            <span>PIPELINE A // TOPIC DISCOVERY</span>
           </h4>
-          <p className="text-xs text-gray-400 leading-relaxed">
-            Unsupervised semantic topic clustering uses dense vector embeddings generated via Sentence Transformers (or TF-IDF TruncatedSVD), projected onto topological manifold coordinates via UMAP, and clustered via HDBSCAN/K-Means. Cluster keywords are extracted using class-based TF-IDF (c-TF-IDF):
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            Dense vector embeddings generated via Sentence Transformers (or TF-IDF TruncatedSVD)
+            are projected via UMAP and clustered via HDBSCAN/K-Means. Keywords are extracted via
+            class-based TF-IDF (c-TF-IDF):
           </p>
-          <div className="p-3 rounded-xl bg-midnight-950 font-mono text-xs text-violet-soft border border-white/5">
+          <div className="p-3.5 bg-black font-mono text-xs text-[#56B4F9] border border-white/10">
             W_(t,c) = tf_(t,c) * log(1 + A / tf_t)
           </div>
         </div>
 
-        <div className="p-6 rounded-2xl bg-midnight-900/60 border border-surface-border backdrop-blur-md space-y-3">
-          <h4 className="text-sm font-bold text-white flex items-center gap-2">
-            <Network className="w-4 h-4 text-cyan-glow" />
-            <span>Community Discovery Pipeline (Pipeline B)</span>
+        <div className="p-6 sm:p-8 space-y-4">
+          <h4 className="font-display text-xs tracking-[0.14em] uppercase text-white flex items-center gap-2">
+            <Network className="w-4 h-4 text-[#FF2E93]" />
+            <span>PIPELINE B // COMMUNITY DETECTION</span>
           </h4>
-          <p className="text-xs text-gray-400 leading-relaxed">
-            Network graph modeling represents users as nodes and social interactions (follows, retweets, mentions) as weighted edges. Communities are partitioned by maximizing the modularity gain function Q:
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            Interaction multigraph modeling represents users as nodes and social actions as
+            weighted edges. Louvain partitioning maximizes network modularity Q:
           </p>
-          <div className="p-3 rounded-xl bg-midnight-950 font-mono text-xs text-cyan-soft border border-white/5">
+          <div className="p-3.5 bg-black font-mono text-xs text-[#FF2E93] border border-white/10">
             Q = 1/(2m) * sum_ij [ A_ij - (k_i * k_j)/(2m) ] * delta(c_i, c_j)
           </div>
         </div>
