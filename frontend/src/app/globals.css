@@ -3,62 +3,70 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 5, 7, 15;
-  --background-end-rgb: 8, 11, 24;
+  color-scheme: dark;
+  --void-bg: #000000;
+  --carbon-surface: #06070a;
+  --electric-blue: #56b4f9;
+  --cyber-pink: #ff2e93;
+  --hairline: rgba(255, 255, 255, 0.14);
 }
 
+html,
 body {
-  color: rgb(var(--foreground-rgb));
-  background: #05070f;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: #000000;
+  color: #ffffff;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom sleek dark scrollbar */
+/* Precision Hairline Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #060914;
+  background: #000000;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #8b5cf6;
+  background: #56b4f9;
 }
 
-.glass-panel {
-  background: rgba(13, 19, 38, 0.65);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+/* Editorial Obsidian Architectural Surfaces */
+.editorial-panel {
+  background-color: #050608;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.glass-panel-hover:hover {
-  background: rgba(18, 26, 52, 0.85);
-  border-color: rgba(139, 92, 246, 0.3);
+.editorial-panel-hover {
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
-.glow-border {
-  position: relative;
+.editorial-panel-hover:hover {
+  border-color: rgba(86, 180, 249, 0.45);
+  background-color: #090b10;
 }
 
-.glow-border::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(6, 182, 212, 0.3), transparent 70%);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
+.glow-text-blue {
+  text-shadow: 0 0 36px rgba(86, 180, 249, 0.35);
+}
+
+.glow-text-pink {
+  text-shadow: 0 0 36px rgba(255, 46, 147, 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
