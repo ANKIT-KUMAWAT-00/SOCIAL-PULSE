@@ -1,53 +1,33 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Database,
   Upload,
   Sparkles,
   Trash2,
   CheckCircle,
-  FileText,
   AlertCircle,
   RefreshCw,
-  Plus
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { Dataset } from "@/types";
+import { useDataset } from "@/context/DatasetContext";
 
 export default function DatasetManagementPage() {
-  const [datasets, setDatasets] = useState<Dataset[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { datasets, selectedDatasetId, setSelectedDatasetId, refreshDatasets } = useDataset();
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [statusMsg, setStatusMsg] = useState<{ type: "success" | "error"; text: string } | null>(
+    null
+  );
 
-  // Synthetic Generator Form State
   const [synthName, setSynthName] = useState("AI & Distributed Systems Cohort");
   const [numPosts, setNumPosts] = useState(400);
   const [numUsers, setNumUsers] = useState(60);
   const [outlierRatio, setOutlierRatio] = useState(0.08);
 
-  // File Upload State
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadName, setUploadName] = useState("");
-  const [uploadDesc, setUploadDesc] = useState("");
-
-  useEffect(() => {
-    loadDatasets();
-  }, []);
-
-  const loadDatasets = async () => {
-    try {
-      setLoading(true);
-      const data = await api.getDatasets();
-      setDatasets(data);
-    } catch (err: any) {
-      setStatusMsg({ type: "error", text: err.message || "Failed to load datasets." });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleGenerateSynthetic = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,16 +36,18 @@ export default function DatasetManagementPage() {
       setStatusMsg(null);
       const newDs = await api.createSyntheticDataset({
         name: synthName,
-        description: `Synthetic benchmark with ${numPosts} posts, ${numUsers} users, and ${Math.round(outlierRatio * 100)}% outliers.`,
+        description: `Synthetic benchmark with ${numPosts} posts, ${numUsers} users, and ${Math.round(
+          outlierRatio * 100
+        )}% outliers.`,
         num_posts: numPosts,
         num_users: numUsers,
         outlier_ratio: outlierRatio,
       });
+      await refreshDatasets(true);
       setStatusMsg({
         type: "success",
-        text: `Generated and analyzed dataset "${newDs.name}" successfully!`,
+        text: `Generated and analyzed "${newDs.name}" successfully.`,
       });
-      loadDatasets();
     } catch (err: any) {
       setStatusMsg({ type: "error", text: err.message || "Synthetic generation failed." });
     } finally {
@@ -80,15 +62,14 @@ export default function DatasetManagementPage() {
     try {
       setUploading(true);
       setStatusMsg(null);
-      const newDs = await api.uploadDataset(uploadFile, uploadName, uploadDesc);
+      const newDs = await api.uploadDataset(uploadFile, uploadName);
+      await refreshDatasets(true);
       setStatusMsg({
         type: "success",
-        text: `Uploaded and processed "${newDs.name}" with ${newDs.num_posts} posts!`,
+        text: `Uploaded and processed "${newDs.name}" (${newDs.num_posts} posts).`,
       });
       setUploadFile(null);
       setUploadName("");
-      setUploadDesc("");
-      loadDatasets();
     } catch (err: any) {
       setStatusMsg({ type: "error", text: err.message || "File upload failed." });
     } finally {
@@ -97,10 +78,10 @@ export default function DatasetManagementPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this dataset?")) return;
+    if (!confirm("Delete this dataset and all associated clusters/communities?")) return;
     try {
       await api.deleteDataset(id);
-      setDatasets(datasets.filter((d) => d.id !== id));
+      await refreshDatasets(false);
       setStatusMsg({ type: "success", text: "Dataset deleted." });
     } catch (err: any) {
       setStatusMsg({ type: "error", text: err.message || "Failed to delete dataset." });
@@ -108,121 +89,122 @@ export default function DatasetManagementPage() {
   };
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
+    <div className="space-y-8 max-w-[1400px] mx-auto">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-          <Database className="w-7 h-7 text-cyan-glow" />
-          <span>Dataset Management & Generation</span>
+      <div className="pb-6 border-b border-white/15">
+        <div className="font-mono text-[10px] tracking-[0.34em] text-[#FF2E93] uppercase mb-2">
+          08 // DATA INGESTION
+        </div>
+        <h1 className="font-display text-2xl sm:text-3xl tracking-[0.06em] uppercase text-white flex items-center gap-3">
+          <Database className="w-6 h-6 text-[#FF2E93]" />
+          <span>DATASET MANAGEMENT</span>
         </h1>
-        <p className="text-xs sm:text-sm text-gray-400 mt-1">
-          Upload custom social media posts and interaction multigraphs (CSV/JSON), or generate multi-topic synthetic benchmarks with configurable noise.
+        <p className="text-xs text-zinc-400 mt-1.5 font-mono">
+          INGEST CSV/JSON SOCIAL CORPORA OR SYNTHESIZE LABELED MULTI-COMMUNITY BENCHMARKS
         </p>
       </div>
 
       {statusMsg && (
         <div
-          className={`p-4 rounded-xl text-xs flex items-center gap-2.5 ${
+          className={`p-4 border font-mono text-xs flex items-center gap-2.5 ${
             statusMsg.type === "success"
-              ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-300"
-              : "bg-rose-500/10 border border-rose-500/20 text-rose-300"
+              ? "bg-[#050608] border-[#56B4F9] text-[#56B4F9]"
+              : "bg-[#050608] border-[#FF2E93] text-[#FF2E93]"
           }`}
         >
           {statusMsg.type === "success" ? (
-            <CheckCircle className="w-4 h-4 min-w-4 text-emerald-400" />
+            <CheckCircle className="w-4 h-4 min-w-4" />
           ) : (
-            <AlertCircle className="w-4 h-4 min-w-4 text-rose-400" />
+            <AlertCircle className="w-4 h-4 min-w-4" />
           )}
           <span>{statusMsg.text}</span>
         </div>
       )}
 
-      {/* Two Action Panels: File Upload & Synthetic Generator */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Panel 1: CSV / JSON Upload */}
-        <div className="p-6 rounded-2xl bg-midnight-900/70 border border-surface-border backdrop-blur-md space-y-5">
-          <div className="flex items-center gap-2 pb-2 border-b border-surface-border text-xs font-mono uppercase text-violet-soft">
-            <Upload className="w-4 h-4 text-violet-glow" />
-            <span>Upload Real Dataset (CSV or JSON)</span>
+      {/* Upload & Synthetic Generator Architectural Split */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 border border-white/15 divide-y lg:divide-y-0 lg:divide-x divide-white/15 bg-[#050608]">
+        {/* Upload Real Dataset */}
+        <div className="p-6 sm:p-8 space-y-5">
+          <div className="flex items-center gap-2 pb-3 border-b border-white/10 font-mono text-[10px] tracking-[0.26em] uppercase text-[#56B4F9]">
+            <Upload className="w-3.5 h-3.5" />
+            <span>UPLOAD REAL DATASET (.CSV / .JSON)</span>
           </div>
 
           <form onSubmit={handleFileUpload} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-gray-300 mb-1.5">
-                Dataset File (.csv or .json)
+              <label className="block font-mono text-[10px] tracking-[0.2em] uppercase text-zinc-400 mb-2">
+                Select File
               </label>
               <input
                 type="file"
                 accept=".csv,.json"
                 onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                className="w-full text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-violet-glow/20 file:text-violet-soft hover:file:bg-violet-glow/30 cursor-pointer"
+                className="w-full text-xs font-mono text-zinc-400 file:mr-4 file:py-2 file:px-4 file:border file:border-[#56B4F9]/50 file:bg-black file:text-[10px] file:font-mono file:uppercase file:tracking-wider file:text-[#56B4F9] hover:file:bg-[#56B4F9] hover:file:text-black cursor-pointer"
                 required
               />
-              <p className="text-[11px] text-gray-500 mt-1">
-                Supported columns: post_id, user_id, text, likes, comments, shares
+              <p className="font-mono text-[10px] text-zinc-600 mt-2">
+                COLUMNS: post_id, user_id, text, likes, comments, shares
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-300 mb-1.5">
-                Dataset Name (Optional)
+              <label className="block font-mono text-[10px] tracking-[0.2em] uppercase text-zinc-400 mb-2">
+                Dataset Label (Optional)
               </label>
               <input
                 type="text"
-                placeholder="e.g. Twitter Tech Discussions Q3"
+                placeholder="e.g. Tech Discourse Export Q4"
                 value={uploadName}
                 onChange={(e) => setUploadName(e.target.value)}
-                className="w-full bg-midnight-950 border border-surface-border rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-violet-glow"
+                className="w-full bg-black border border-white/15 px-3 py-2 font-mono text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-[#56B4F9]"
               />
             </div>
 
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={uploading || !uploadFile}
-                className="w-full py-2.5 rounded-xl bg-violet-glow hover:bg-violet-dark text-white font-semibold text-xs transition-all disabled:opacity-40 flex items-center justify-center gap-2 shadow-glow-violet"
-              >
-                {uploading ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Processing & Running ML Pipelines...</span>
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Upload & Analyze Dataset</span>
-                  </>
-                )}
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={uploading || !uploadFile}
+              className="w-full py-2.5 bg-[#56B4F9] hover:bg-[#7CC8FF] text-black font-mono font-bold text-[11px] tracking-[0.22em] uppercase transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+            >
+              {uploading ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>INDEXING & RUNNING ML...</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>UPLOAD & ANALYZE</span>
+                </>
+              )}
+            </button>
           </form>
         </div>
 
-        {/* Panel 2: Synthetic Dataset Generator */}
-        <div className="p-6 rounded-2xl bg-midnight-900/70 border border-surface-border backdrop-blur-md space-y-5">
-          <div className="flex items-center gap-2 pb-2 border-b border-surface-border text-xs font-mono uppercase text-cyan-soft">
-            <Sparkles className="w-4 h-4 text-cyan-glow" />
-            <span>Generate Realistic Synthetic Benchmark</span>
+        {/* Synthetic Generator */}
+        <div className="p-6 sm:p-8 space-y-5">
+          <div className="flex items-center gap-2 pb-3 border-b border-white/10 font-mono text-[10px] tracking-[0.26em] uppercase text-[#FF2E93]">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>SYNTHESIZE BENCHMARK GRAPH</span>
           </div>
 
           <form onSubmit={handleGenerateSynthetic} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-gray-300 mb-1.5">
+              <label className="block font-mono text-[10px] tracking-[0.2em] uppercase text-zinc-400 mb-2">
                 Benchmark Name
               </label>
               <input
                 type="text"
                 value={synthName}
                 onChange={(e) => setSynthName(e.target.value)}
-                className="w-full bg-midnight-950 border border-surface-border rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-glow"
+                className="w-full bg-black border border-white/15 px-3 py-2 font-mono text-xs text-white focus:outline-none focus:border-[#FF2E93]"
                 required
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-300 mb-1.5">
-                  Posts Count: {numPosts}
+                <label className="block font-mono text-[10px] tracking-[0.18em] uppercase text-zinc-400 mb-2">
+                  Posts: {numPosts}
                 </label>
                 <input
                   type="range"
@@ -231,13 +213,13 @@ export default function DatasetManagementPage() {
                   step="50"
                   value={numPosts}
                   onChange={(e) => setNumPosts(Number(e.target.value))}
-                  className="w-full accent-cyan-glow"
+                  className="w-full accent-[#56B4F9]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-300 mb-1.5">
-                  Users Count: {numUsers}
+                <label className="block font-mono text-[10px] tracking-[0.18em] uppercase text-zinc-400 mb-2">
+                  Users: {numUsers}
                 </label>
                 <input
                   type="range"
@@ -246,14 +228,14 @@ export default function DatasetManagementPage() {
                   step="10"
                   value={numUsers}
                   onChange={(e) => setNumUsers(Number(e.target.value))}
-                  className="w-full accent-violet-glow"
+                  className="w-full accent-[#FF2E93]"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-300 mb-1.5">
-                Noise / Outlier Ratio: {(outlierRatio * 100).toFixed(0)}%
+              <label className="block font-mono text-[10px] tracking-[0.18em] uppercase text-zinc-400 mb-2">
+                Outlier Ratio: {(outlierRatio * 100).toFixed(0)}%
               </label>
               <input
                 type="range"
@@ -262,96 +244,115 @@ export default function DatasetManagementPage() {
                 step="0.01"
                 value={outlierRatio}
                 onChange={(e) => setOutlierRatio(Number(e.target.value))}
-                className="w-full accent-rose-400"
+                className="w-full accent-[#FF2E93]"
               />
             </div>
 
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={generating}
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-glow to-violet-glow hover:brightness-110 text-white font-semibold text-xs transition-all disabled:opacity-40 flex items-center justify-center gap-2 shadow-glow-cyan"
-              >
-                {generating ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Synthesizing Graph & Embeddings...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Generate & Index Benchmark</span>
-                  </>
-                )}
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={generating}
+              className="w-full py-2.5 bg-[#FF2E93] hover:bg-[#FF66B2] text-white font-mono font-bold text-[11px] tracking-[0.22em] uppercase transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+            >
+              {generating ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>SYNTHESIZING GRAPH...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>GENERATE BENCHMARK</span>
+                </>
+              )}
+            </button>
           </form>
         </div>
       </div>
 
-      {/* Available Datasets Table */}
-      <div className="p-6 rounded-2xl bg-midnight-900/70 border border-surface-border backdrop-blur-md space-y-4">
-        <h3 className="text-base font-semibold text-white">Loaded Datasets</h3>
+      {/* Loaded Datasets Registry */}
+      <div className="border border-white/15 bg-[#050608] p-6 space-y-4">
+        <h3 className="font-display text-sm tracking-[0.12em] uppercase text-white">
+          DATASET REGISTRY
+        </h3>
 
         {datasets.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-midnight-950 text-gray-400 border-b border-surface-border">
+              <thead className="bg-black text-zinc-500 border-b border-white/15 uppercase text-[10px] tracking-[0.16em]">
                 <tr>
                   <th className="py-3 px-4 font-medium">Dataset</th>
-                  <th className="py-3 px-4 font-medium">Type</th>
+                  <th className="py-3 px-4 font-medium">Origin</th>
                   <th className="py-3 px-4 font-medium">Posts</th>
                   <th className="py-3 px-4 font-medium">Users</th>
-                  <th className="py-3 px-4 font-medium">Connections</th>
-                  <th className="py-3 px-4 font-medium">Created At</th>
-                  <th className="py-3 px-4 font-medium text-right">Action</th>
+                  <th className="py-3 px-4 font-medium">Edges</th>
+                  <th className="py-3 px-4 font-medium">Created</th>
+                  <th className="py-3 px-4 font-medium text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-surface-border text-gray-300">
-                {datasets.map((d) => (
-                  <tr key={d.id} className="hover:bg-white/5 transition-colors">
-                    <td className="py-3.5 px-4 font-semibold text-white">
-                      <div>{d.name}</div>
-                      {d.description && (
-                        <div className="text-[11px] text-gray-500 font-sans truncate max-w-sm mt-0.5">
-                          {d.description}
+              <tbody className="divide-y divide-white/10 text-zinc-300 tabular-nums">
+                {datasets.map((d) => {
+                  const isActive = d.id === selectedDatasetId;
+                  return (
+                    <tr
+                      key={d.id}
+                      onClick={() => setSelectedDatasetId(d.id)}
+                      className={`cursor-pointer transition-colors ${
+                        isActive ? "bg-white/[0.06]" : "hover:bg-white/[0.03]"
+                      }`}
+                    >
+                      <td className="py-3.5 px-4 font-semibold text-white">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`w-2 h-2 ${
+                              isActive ? "bg-[#56B4F9]" : "bg-zinc-600"
+                            }`}
+                          />
+                          <span>{d.name}</span>
                         </div>
-                      )}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      {d.is_synthetic ? (
-                        <span className="px-2 py-0.5 rounded bg-violet-glow/15 text-violet-soft border border-violet-glow/30 text-[10px]">
-                          SYNTHETIC
+                        {d.description && (
+                          <div className="text-[11px] text-zinc-500 font-sans truncate max-w-sm mt-0.5 pl-4">
+                            {d.description}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`px-2 py-0.5 text-[9px] tracking-[0.18em] uppercase border ${
+                            d.is_synthetic
+                              ? "border-[#FF2E93]/40 text-[#FF2E93]"
+                              : "border-[#56B4F9]/40 text-[#56B4F9]"
+                          }`}
+                        >
+                          {d.is_synthetic ? "SYNTHETIC" : "UPLOADED"}
                         </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded bg-cyan-glow/15 text-cyan-soft border border-cyan-glow/30 text-[10px]">
-                          UPLOADED
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-white">{d.num_posts}</td>
-                    <td className="py-3.5 px-4">{d.num_users}</td>
-                    <td className="py-3.5 px-4">{d.num_relationships}</td>
-                    <td className="py-3.5 px-4 text-gray-500">
-                      {new Date(d.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => handleDelete(d.id)}
-                        className="text-gray-500 hover:text-rose-400 transition-colors p-1"
-                        title="Delete dataset"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-white">{d.num_posts}</td>
+                      <td className="py-3.5 px-4">{d.num_users}</td>
+                      <td className="py-3.5 px-4">{d.num_relationships}</td>
+                      <td className="py-3.5 px-4 text-zinc-500">
+                        {new Date(d.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(d.id);
+                          }}
+                          className="text-zinc-500 hover:text-[#FF2E93] transition-colors p-1"
+                          title="Delete dataset"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         ) : (
-          <div className="py-12 text-center text-xs font-mono text-gray-500">
-            No datasets currently available. Use the forms above to generate or upload data.
+          <div className="py-12 text-center font-mono text-[11px] tracking-[0.2em] uppercase text-zinc-600">
+            NO DATASETS CURRENTLY AVAILABLE.
           </div>
         )}
       </div>
