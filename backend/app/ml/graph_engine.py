@@ -4,16 +4,16 @@ import community as community_louvain
 from typing import List, Dict, Any, Tuple
 
 COMMUNITY_COLORS = [
-    "#06b6d4", # Cyber Cyan
-    "#8b5cf6", # Electric Violet
-    "#10b981", # Emerald Pulse
-    "#f59e0b", # Solar Amber
-    "#ec4899", # Neon Pink
-    "#3b82f6", # Blue Wave
-    "#14b8a6", # Teal Aura
-    "#f97316", # Orange Flame
-    "#a855f7", # Purple Glow
-    "#6366f1"  # Indigo Spark
+    "#56B4F9", # Electric Sky Blue
+    "#FF2E93", # Cyber Magenta
+    "#22D3EE", # Ice Cyan
+    "#C084FC", # Luminous Orchid
+    "#34D399", # Mint Pulse
+    "#FBBF24", # Amber Gold
+    "#FB7185", # Coral Rose
+    "#60A5FA", # Cobalt Glow
+    "#E879F9", # Fuchsia Spark
+    "#94A3B8"  # Silver Mist
 ]
 
 class CommunityEngine:
